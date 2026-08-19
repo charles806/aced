@@ -1,0 +1,182 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjects Subject[]
+  notes    Note[]
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notes Note[]
+
+  @@index([userId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  fileName  String
+  fileUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subjectId])
+}
+
+// ==========================================
+// Radon Auth models
+// ==========================================
+
+model RadonUser {
+  id            String   @id
+  email         String?
+  emailVerified Boolean
+  metadata      Json
+  createdAt     DateTime
+  updatedAt     DateTime
+
+  @@index([email])
+}
+
+model RadonIdentity {
+  id                String   @id
+  userId            String
+  provider          String
+  providerAccountId String
+  metadata          Json
+  createdAt         DateTime
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model RadonOneTimeCode {
+  id         String    @id
+  identifier String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  attempts   Int
+  consumedAt DateTime?
+  metadata   Json
+  createdAt  DateTime
+
+  @@index([identifier, purpose])
+  @@index([expiresAt])
+}
+
+model RadonSession {
+  id        String   @id
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  metadata  Json
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RadonRefreshToken {
+  id        String    @id
+  userId    String
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  device    Json
+  metadata  Json
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model RadonApiKey {
+  id         String    @id
+  userId     String?
+  orgId      String?
+  prefix     String
+  keyHash    String    @unique
+  name       String
+  scopes     String[]
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  metadata   Json
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([orgId])
+}
+
+model RadonOrg {
+  id        String   @id
+  name      String
+  slug      String   @unique
+  metadata  Json
+  createdAt DateTime
+  updatedAt DateTime
+}
+
+model RadonOrgMembership {
+  id        String   @id
+  orgId     String
+  userId    String
+  role      String
+  metadata  Json
+  createdAt DateTime
+
+  @@unique([orgId, userId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model RadonOrgInvite {
+  id              String    @id
+  orgId           String
+  email           String
+  role            String
+  tokenHash       String    @unique
+  invitedByUserId String?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  metadata        Json
+  createdAt       DateTime
+
+  @@index([orgId])
+}

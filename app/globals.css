@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  button:not(:disabled),
+  a,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
+@theme {
+  --font-display: var(--font-playfair), "Georgia", serif;
+
+  --color-accent-50: #fff1f5;
+  --color-accent-100: #ffe3ec;
+  --color-accent-200: #ffc6d9;
+  --color-accent-300: #ff9cbf;
+  --color-accent-400: #ff6ea1;
+  --color-accent-500: #ff4e88;
+  --color-accent-600: #ed2f6e;
+  --color-accent-700: #c81f58;
+  --color-accent-800: #a51d4c;
+  --color-accent-900: #8a1d46;
+}
