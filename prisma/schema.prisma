@@ -40,13 +40,15 @@ model Subject {
 model Note {
   id        String   @id @default(cuid())
   title     String
-  fileName  String
-  fileUrl   String
+  content   String?
+  fileName  String?
+  fileUrl   String?
+  fileType  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   subjectId String
   subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
