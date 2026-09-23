@@ -183,7 +183,7 @@ export default function DashboardPage() {
         <AITutorCard />
       </section>
 
-      <section aria-labelledby="subjects-heading" className="mt-10">
+      <section aria-labelledby="subjects-heading" className="mt-10 cursor-pointer">
         <SectionHeading title="Your subjects">
           {subjectsState.status === "ready" ? (
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
