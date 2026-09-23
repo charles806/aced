@@ -19,11 +19,12 @@ import {
 } from "@/components/dashboard/subject-card";
 import { ProgressCharts } from "@/components/dashboard/progress-charts";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { StudyTimer } from "@/components/dashboard/study-timer";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { useProgress } from "@/components/dashboard/use-progress";
+import { formatDuration } from "@/app/lib/format";
 import { useSubjects } from "@/components/dashboard/use-subjects";
-import {
-  useNotes,
-  withSubjectNames,
-} from "@/components/dashboard/use-notes";
+import { useNotes, withSubjectNames } from "@/components/dashboard/use-notes";
 import { NotesSection } from "@/components/notes/notes-section";
 
 function SectionHeading({
@@ -50,10 +51,16 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState("Good afternoon, Student");
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem("sv-name") : null;
+    const stored =
+      typeof window !== "undefined" ? localStorage.getItem("sv-name") : null;
     const displayName = stored || "Student";
     const hour = new Date().getHours();
-    const part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    const part =
+      hour < 12
+        ? "Good morning"
+        : hour < 17
+          ? "Good afternoon"
+          : "Good evening";
     const frame = window.requestAnimationFrame(() => {
       setName(displayName);
       setGreeting(`${part}, ${displayName}`);
@@ -61,16 +68,11 @@ export default function DashboardPage() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const {
-    state: subjectsState,
-    reload: reloadSubjects,
-  } = useSubjects();
+  const { state: subjectsState, reload: reloadSubjects } = useSubjects();
 
-  const {
-    state: notesState,
-    reload: reloadNotes,
-    setNotes,
-  } = useNotes();
+  const { state: notesState, reload: reloadNotes, setNotes } = useNotes();
+
+  const { state: progressState, reload: reloadProgress } = useProgress();
 
   const readySubjects =
     subjectsState.status === "ready" ? subjectsState.subjects : [];
@@ -81,7 +83,7 @@ export default function DashboardPage() {
 
   const handleNoteUpdated = (note: (typeof displayNotes)[number]) => {
     setNotes((previous) =>
-      previous.map((item) => (item.id === note.id ? note : item))
+      previous.map((item) => (item.id === note.id ? note : item)),
     );
   };
 
@@ -94,19 +96,37 @@ export default function DashboardPage() {
       id: "studyTime",
       icon: Clock,
       label: "Today's study time",
-      value: "—",
-      hint: "Not tracked yet",
+      value:
+        progressState.status === "ready"
+          ? formatDuration(progressState.stats.todayMs / 1000)
+          : "—",
+      hint:
+        progressState.status === "ready"
+          ? "today"
+          : progressState.status === "error"
+            ? "Unavailable"
+            : "",
       sample: false,
-      skeleton: false,
+      skeleton: progressState.status === "loading",
     },
     {
       id: "streak",
       icon: Flame,
       label: "Day streak",
-      value: "—",
-      hint: "Coming soon",
+      value:
+        progressState.status === "ready"
+          ? String(progressState.stats.streakDays)
+          : "—",
+      hint:
+        progressState.status === "ready"
+          ? progressState.stats.streakDays === 1
+            ? "day in a row"
+            : "days in a row"
+          : progressState.status === "error"
+            ? "Unavailable"
+            : "",
       sample: false,
-      skeleton: false,
+      skeleton: progressState.status === "loading",
     },
     {
       id: "subjects",
@@ -170,12 +190,11 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section aria-labelledby="continue-heading" className="mt-10">
-        <SectionHeading title="Continue studying" />
-        <EmptyState
-          icon={Clock}
-          title="Nothing in progress"
-          description="Study sessions you start will appear here so you can pick up where you left off."
+      <section aria-labelledby="study-timer-title" className="mt-10">
+        <StudyTimer
+          subjects={readySubjects}
+          onSessionSaved={() => void reloadProgress()}
+          onSignIn={() => router.push("/signin")}
         />
       </section>
 
@@ -183,7 +202,10 @@ export default function DashboardPage() {
         <AITutorCard />
       </section>
 
-      <section aria-labelledby="subjects-heading" className="mt-10 cursor-pointer">
+      <section
+        aria-labelledby="subjects-heading"
+        className="mt-10 cursor-pointer"
+      >
         <SectionHeading title="Your subjects">
           {subjectsState.status === "ready" ? (
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -238,7 +260,76 @@ export default function DashboardPage() {
 
       <section aria-label="Progress" className="mt-10">
         <SectionHeading title="Progress" />
-        <ProgressCharts />
+        {progressState.status === "loading" ? (
+          <div className="grid gap-6 sm:grid-cols-2" aria-hidden="true">
+            {[0, 1].map((index) => (
+              <div
+                key={index}
+                className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                <div className="mt-1.5 h-3 w-36 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                <div className="mt-6 h-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+              </div>
+            ))}
+          </div>
+        ) : progressState.status === "error" ? (
+          <EmptyState
+            icon={AlertCircle}
+            title="Couldn't load your progress"
+            description={progressState.message}
+            cta={{
+              label: progressState.unauthorized ? "Sign in again" : "Try again",
+              onClick: () => {
+                if (progressState.unauthorized) {
+                  router.push("/signin");
+                  return;
+                }
+                void reloadProgress();
+              },
+            }}
+          />
+        ) : (
+          <ProgressCharts stats={progressState.stats} />
+        )}
+      </section>
+
+      <section aria-labelledby="activity-heading" className="mt-10">
+        <SectionHeading title="Recent activity" />
+        {progressState.status === "loading" ? (
+          <ul
+            className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+            aria-hidden="true"
+          >
+            {[0, 1, 2, 3].map((index) => (
+              <li
+                key={index}
+                className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 last:border-b-0 dark:border-zinc-800"
+              >
+                <div className="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+                <div className="h-3 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+              </li>
+            ))}
+          </ul>
+        ) : progressState.status === "error" ? (
+          <EmptyState
+            icon={AlertCircle}
+            title="Couldn't load your activity"
+            description={progressState.message}
+            cta={{
+              label: progressState.unauthorized ? "Sign in again" : "Try again",
+              onClick: () => {
+                if (progressState.unauthorized) {
+                  router.push("/signin");
+                  return;
+                }
+                void reloadProgress();
+              },
+            }}
+          />
+        ) : (
+          <ActivityFeed items={progressState.activity} />
+        )}
       </section>
 
       <section aria-labelledby="notes-heading" className="mt-10">

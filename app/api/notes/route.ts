@@ -1,7 +1,9 @@
+import { createActivity } from "@/app/lib/activity";
 import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getSignedFileUrl, storage } from "@/app/lib/storage";
+import { Prisma } from "@/app/generated/prisma/client";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,8 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const subjectId = searchParams.get("subjectId");
+        const search = searchParams.get("search");
+        const fileType = searchParams.get("fileType");
 
         if (subjectId !== null) {
             if (typeof subjectId !== "string" || subjectId.trim() === "") {
@@ -35,11 +39,31 @@ export async function GET(req: Request) {
             }
         }
 
+        const where: Prisma.NoteWhereInput = {
+            userId: user.id,
+        };
+
+        if (subjectId !== null) {
+            where.subjectId = subjectId;
+        }
+
+        const trimmedSearch = search?.trim();
+        if (trimmedSearch) {
+            where.title = {
+                contains: trimmedSearch,
+                mode: "insensitive",
+            };
+        }
+
+        const trimmedFileType = fileType?.trim();
+        if (trimmedFileType) {
+            where.fileType = trimmedFileType.endsWith("/*")
+                ? { startsWith: trimmedFileType.slice(0, -1) }
+                : { equals: trimmedFileType };
+        }
+
         const notes = await prisma.note.findMany({
-            where: {
-                userId: user.id,
-                ...(subjectId !== null && { subjectId }),
-            },
+            where,
             orderBy: {
                 createdAt: "desc",
             },
@@ -144,6 +168,14 @@ export async function POST(req: Request) {
                 userId: user.id,
                 subjectId: subject.id,
             },
+        });
+
+        void createActivity({
+            userId: user.id,
+            type: "note_created",
+            noteId: result.id,
+            subjectId: result.subjectId,
+            label: `Created note "${result.title}"`,
         });
 
         return Response.json(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest, type ApiResult } from "@/app/lib/api-client";
 import type { Subject } from "@/components/dashboard/use-subjects";
 
@@ -26,32 +26,88 @@ export type NotesState =
   | { status: "error"; message: string; unauthorized: boolean }
   | { status: "ready"; notes: Note[] };
 
-const LOAD_NOT_FOUND_FALLBACK = "Your notes could not be found.";
-
 type NotesPayload = { notes: Note[] };
 
-export function useNotes() {
-  const [state, setState] = useState<NotesState>({ status: "loading" });
+export type NoteFilters = {
+  search?: string;
+  subjectId?: string;
+  fileType?: string;
+};
+
+type NotesStateInternal =
+  | { status: "loading" }
+  | {
+      status: "error";
+      message: string;
+      unauthorized: boolean;
+      forQuery: string;
+    }
+  | { status: "ready"; notes: Note[]; forQuery: string };
+
+const LOAD_NOT_FOUND_FALLBACK = "Your notes could not be found.";
+
+const SEARCH_DEBOUNCE_MS = 300;
+
+function buildNotesQuery(filters: NoteFilters): string {
+  const params = new URLSearchParams();
+
+  const search = filters.search?.trim();
+  if (search) params.set("search", search);
+
+  if (filters.subjectId) params.set("subjectId", filters.subjectId);
+  if (filters.fileType) params.set("fileType", filters.fileType);
+
+  return params.toString();
+}
+
+export function useNotes(filters: NoteFilters = {}) {
+  const [internalState, setState] = useState<NotesStateInternal>({
+    status: "loading",
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search ?? "");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(filters.search ?? "");
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [filters.search]);
+
+  const queryString = useMemo(() => {
+    return buildNotesQuery({
+      search: debouncedSearch,
+      subjectId: filters.subjectId,
+      fileType: filters.fileType,
+    });
+  }, [debouncedSearch, filters.subjectId, filters.fileType]);
 
   const fetchNotes = useCallback(async (): Promise<ApiResult<NotesPayload>> => {
-    return apiRequest<NotesPayload>("/api/notes", {
+    const url =
+      queryString === "" ? "/api/notes" : `/api/notes?${queryString}`;
+
+    return apiRequest<NotesPayload>(url, {
       notFoundMessage: LOAD_NOT_FOUND_FALLBACK,
     });
-  }, []);
+  }, [queryString]);
 
-  const applyResult = useCallback((result: ApiResult<NotesPayload>) => {
-    if (!result.ok) {
-      setState({
-        status: "error",
-        message: result.failure.message,
-        unauthorized: result.failure.kind === "unauthorized",
-      });
-      return;
-    }
+  const applyResult = useCallback(
+    (result: ApiResult<NotesPayload>) => {
+      if (!result.ok) {
+        setState({
+          status: "error",
+          message: result.failure.message,
+          unauthorized: result.failure.kind === "unauthorized",
+          forQuery: queryString,
+        });
+        return;
+      }
 
-    const notes = Array.isArray(result.data?.notes) ? result.data.notes : [];
-    setState({ status: "ready", notes });
-  }, []);
+      const notes = Array.isArray(result.data?.notes) ? result.data.notes : [];
+      setState({ status: "ready", notes, forQuery: queryString });
+    },
+    [queryString]
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -73,13 +129,20 @@ export function useNotes() {
   const setNotes = useCallback(
     (update: (previous: Note[]) => Note[]) => {
       setState((current) =>
-        current.status === "ready"
-          ? { status: "ready", notes: update(current.notes) }
+        current.status === "ready" && current.forQuery === queryString
+          ? { ...current, notes: update(current.notes) }
           : current
       );
     },
-    []
+    [queryString]
   );
+
+  const state = useMemo<NotesState>(() => {
+    if (internalState.status !== "loading" && internalState.forQuery !== queryString) {
+      return { status: "loading" };
+    }
+    return internalState;
+  }, [internalState, queryString]);
 
   return { state, reload, setNotes };
 }

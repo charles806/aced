@@ -1,3 +1,4 @@
+import { createActivity } from "@/app/lib/activity";
 import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
@@ -45,6 +46,14 @@ export async function GET(
             signed: true,
             expiresIn: SIGNED_URL_TTL_SECONDS,
             responseContentType: note.fileType ?? undefined,
+        });
+
+        void createActivity({
+            userId: user.id,
+            type: "note_opened",
+            noteId: note.id,
+            subjectId: note.subjectId,
+            label: `Opened note "${note.title}"`,
         });
 
         return Response.json({

@@ -1,3 +1,4 @@
+import { createActivity } from "@/app/lib/activity";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import {
@@ -58,6 +59,13 @@ export async function POST(req: Request) {
                 name: validated.name,
                 userId: user.id,
             },
+        });
+
+        void createActivity({
+            userId: user.id,
+            type: "subject_created",
+            subjectId: subject.id,
+            label: `Created subject "${subject.name}"`,
         });
 
         return Response.json({ subject }, { status: 201 });

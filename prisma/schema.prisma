@@ -21,7 +21,8 @@ model Subject {
   userId String
   user   RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  notes Note[]
+  notes         Note[]
+  studySessions StudySession[]
 
   @@index([userId])
 }
@@ -46,6 +47,76 @@ model Note {
   @@index([subjectId])
 }
 
+model StudySession {
+  id        String    @id @default(cuid())
+  startedAt DateTime
+  endedAt   DateTime?
+  duration  Int?
+  pausedMs  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([subjectId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  type      String
+  noteId    String?
+  subjectId String?
+  label     String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Subscription {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider String @default("bachs")
+
+  providerCustomerId     String?
+  providerSubscriptionId String? @unique
+
+  plan   String @default("pro")
+  status String
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  cancelAtPeriodEnd Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  eventType String
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([provider, processedAt])
+}
+
 // ==========================================
 // Radon Auth models
 // ==========================================
@@ -58,8 +129,11 @@ model RadonUser {
   createdAt     DateTime
   updatedAt     DateTime
 
-  subjects Subject[]
-  notes    Note[]
+  subjects       Subject[]
+  notes          Note[]
+  studySessions  StudySession[]
+  activities     Activity[]
+  subscription   Subscription?
 
   @@index([email])
 }

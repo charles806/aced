@@ -33,3 +33,13 @@ export function validateSubjectName(
 
     return { name };
 }
+
+export function validateSubjectId(
+    value: unknown
+): { subjectId: string } | { error: string } {
+    if (typeof value !== "string" || value.trim() === "") {
+        return { error: "Subject ID must be a non-empty string" };
+    }
+
+    return { subjectId: value.trim() };
+}

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AlertCircle, FileText, X } from "lucide-react";
+import { AlertCircle, FileText, SearchX, X } from "lucide-react";
 import { apiRequest } from "@/app/lib/api-client";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoteItem, NoteItemSkeleton } from "@/components/dashboard/note-item";
@@ -45,6 +45,8 @@ type NotesSectionProps = {
   onCreated: (note: NoteWithSubjectName) => void;
   onUpdated: (note: NoteWithSubjectName) => void;
   onDeleted: (noteId: string) => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 };
 
 const NOTICE_MS = 5000;
@@ -67,6 +69,8 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
       onCreated,
       onUpdated,
       onDeleted,
+      hasActiveFilters = false,
+      onClearFilters,
     },
     ref
   ) {
@@ -220,10 +224,18 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
       if (notes.length === 0) {
         return (
           <EmptyState
-            icon={FileText}
-            title="No notes yet"
-            description="Upload your first study note and it will appear here, ready to review."
-            cta={{ label: "New note", onClick: () => setCreateOpen(true) }}
+            icon={hasActiveFilters ? SearchX : FileText}
+            title={hasActiveFilters ? "No notes found" : "No notes yet"}
+            description={
+              hasActiveFilters
+                ? "Try a different search or clear your filters to see all your notes."
+                : "Upload your first study note and it will appear here, ready to review."
+            }
+            cta={
+              hasActiveFilters
+                ? { label: "Clear filters", onClick: () => onClearFilters?.() }
+                : { label: "New note", onClick: () => setCreateOpen(true) }
+            }
           />
         );
       }

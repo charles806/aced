@@ -8,14 +8,17 @@ import { useSubjects } from "@/components/dashboard/use-subjects";
 import {
   useNotes,
   withSubjectNames,
+  type NoteFilters,
   type NoteWithSubjectName,
 } from "@/components/dashboard/use-notes";
+import { NotesFilters } from "@/components/notes/notes-filters";
 import { NotesSection } from "@/components/notes/notes-section";
 
 export default function NotesPage() {
   const router = useRouter();
   const notesRef = useRef<{ openCreate: () => void }>(null);
   const [name, setName] = useState("Student");
+  const [filters, setFilters] = useState<NoteFilters>({});
 
   useEffect(() => {
     const stored =
@@ -31,17 +34,31 @@ export default function NotesPage() {
     state: notesState,
     reload: reloadNotes,
     setNotes,
-  } = useNotes();
+  } = useNotes(filters);
 
   const readySubjects =
     subjectsState.status === "ready" ? subjectsState.subjects : [];
   const readyNotes = notesState.status === "ready" ? notesState.notes : [];
   const displayNotes = withSubjectNames(readyNotes, readySubjects);
+  const hasActiveFilters = Boolean(
+    filters.search?.trim() || filters.subjectId || filters.fileType
+  );
+
+  const handleFiltersChange = (next: NoteFilters) => setFilters(next);
+
+  const handleClearFilters = () => setFilters({});
+
+  const handleNoteCreated = (note: NoteWithSubjectName) => {
+    if (hasActiveFilters) void reloadNotes();
+    else setNotes((previous) => [note, ...previous]);
+  };
 
   const handleNoteUpdated = (note: NoteWithSubjectName) => {
-    setNotes((previous) =>
-      previous.map((item) => (item.id === note.id ? note : item))
-    );
+    if (hasActiveFilters) void reloadNotes();
+    else
+      setNotes((previous) =>
+        previous.map((item) => (item.id === note.id ? note : item))
+      );
   };
 
   const handleNoteDeleted = (noteId: string) => {
@@ -69,7 +86,16 @@ export default function NotesPage() {
         </button>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6">
+        <NotesFilters
+          filters={filters}
+          subjects={readySubjects}
+          onChange={handleFiltersChange}
+          onClear={handleClearFilters}
+        />
+      </div>
+
+      <div className="mt-6">
         <NotesSection
           ref={notesRef}
           notes={displayNotes}
@@ -85,9 +111,11 @@ export default function NotesPage() {
           onRetry={() => void reloadNotes()}
           onSignIn={() => router.push("/signin")}
           subjects={readySubjects}
-          onCreated={(note) => setNotes((previous) => [note, ...previous])}
+          onCreated={handleNoteCreated}
           onUpdated={handleNoteUpdated}
           onDeleted={handleNoteDeleted}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={handleClearFilters}
         />
       </div>
     </DashboardShell>

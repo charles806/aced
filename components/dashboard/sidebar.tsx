@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogoMark } from "@/components/logo-mark";
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { NAV_ITEMS, SIDEBAR_BOTTOM_NAV, type NavItem } from "./nav-config";
 
 function isActive(pathname: string, item: NavItem): boolean {
@@ -33,6 +34,7 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
 export function Sidebar({ name }: { name: string }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-zinc-200 bg-white lg:flex dark:border-zinc-800 dark:bg-zinc-900">
@@ -56,6 +58,10 @@ export function Sidebar({ name }: { name: string }) {
         {SIDEBAR_BOTTOM_NAV.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} />
         ))}
+      </div>
+
+      <div className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
+        <UpgradeButton onUnauthorized={() => router.push("/signin")} />
       </div>
 
       <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
