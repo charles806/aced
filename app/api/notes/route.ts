@@ -1,11 +1,63 @@
 import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { storage } from "@/app/lib/storage";
+import { getSignedFileUrl, storage } from "@/app/lib/storage";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+export async function GET(req: Request) {
+    try {
+        const user = await getCurrentUser(req);
+
+        if (!user) {
+            return jsonError("Unauthorized", 401);
+        }
+
+        const { searchParams } = new URL(req.url);
+        const subjectId = searchParams.get("subjectId");
+
+        if (subjectId !== null) {
+            if (typeof subjectId !== "string" || subjectId.trim() === "") {
+                return jsonError("Subject ID must be a non-empty string", 400);
+            }
+
+            const subject = await prisma.subject.findFirst({
+                where: {
+                    id: subjectId,
+                    userId: user.id,
+                },
+            });
+
+            if (!subject) {
+                return jsonError("Subject not found", 404);
+            }
+        }
+
+        const notes = await prisma.note.findMany({
+            where: {
+                userId: user.id,
+                ...(subjectId !== null && { subjectId }),
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+        });
+
+        const notesWithUrls = await Promise.all(
+            notes.map(async (note) => ({
+                ...note,
+                signedUrl: await getSignedFileUrl(note.fileUrl),
+            }))
+        );
+
+        return Response.json({ notes: notesWithUrls });
+    } catch (error) {
+        console.error("GET /api/notes failed:", error);
+        return jsonError("Something went wrong", 500);
+    }
+}
 
 export async function POST(req: Request) {
     try {

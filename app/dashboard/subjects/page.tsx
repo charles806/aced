@@ -26,7 +26,6 @@ const inputClasses =
 const labelClasses =
   "mb-1.5 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
 
-const fieldErrorClasses = "mt-1.5 text-xs text-red-600 dark:text-red-400";
 
 const bannerClasses =
   "rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/50 dark:bg-red-950/40 dark:text-red-300";
@@ -315,7 +314,7 @@ export default function SubjectsPage() {
           <input
             id="subject-name"
             type="text"
-            autoComplete="off"
+            // autoComplete="off"
             maxLength={NAME_MAX_LENGTH + 20}
             placeholder="e.g. Mathematics"
             value={pendingName}
@@ -323,7 +322,7 @@ export default function SubjectsPage() {
             aria-invalid={Boolean(formError)}
             aria-describedby={formError ? "subject-name-error" : undefined}
             className={inputClasses}
-            autoFocus
+            // autoFocus
           />
 
           <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">

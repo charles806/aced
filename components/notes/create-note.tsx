@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
   FileText,
-  AlertCircle,
   Loader2,
   Upload,
   X,
@@ -14,21 +13,12 @@ import {
   useSubjects,
   type Subject,
 } from "@/components/dashboard/use-subjects";
+import {
+  type Note,
+  type NoteWithSubjectName,
+} from "@/components/dashboard/use-notes";
 
-export type Note = {
-  id: string;
-  title: string;
-  content?: string | null;
-  fileName?: string | null;
-  fileUrl?: string | null;
-  fileType?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  userId: string;
-  subjectId: string;
-};
-
-export type NoteWithSubjectName = Note & { subjectName: string };
+export type { Note, NoteWithSubjectName };
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -83,16 +73,6 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setTitle("");
-    setSubjectId("");
-    setFile(null);
-    setErrors({});
-    setTouched({ title: false, subject: false, file: false });
-    setServerError(null);
-  }, [open]);
 
   const subjects =
     subjectsState.status === "ready" ? subjectsState.subjects : [];

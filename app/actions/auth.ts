@@ -18,27 +18,7 @@ export async function signUp(input: { name: string; email: string; password: str
         metadata: { name: input.name.trim() }
     })
 
-    let appUser
-    try {
-        appUser = await prisma.user.upsert({
-            where: { email },
-            update: { name: input.name.trim() },
-            create: { email, name: input.name.trim() },
-        })
-    } catch (error) {
-        // Mirror write failed — roll back the Radon account so we never leave
-        // a half-created user behind, then rethrow for the client.
-        try {
-            await prisma.radonIdentity.deleteMany({ where: { userId: radonUser.user.id } })
-            await prisma.radonSession.deleteMany({ where: { userId: radonUser.user.id } })
-            await prisma.radonUser.delete({ where: { id: radonUser.user.id } })
-        } catch (cleanupError) {
-            console.error("Failed to clean up Radon user after mirror failure:", cleanupError)
-        }
-        throw error
-    }
-
-    return { ok: true as const, user: appUser }
+    return { ok: true as const, user: radonUser.user }
 }
 
 export async function login(input: { email: string, password: string }) {
@@ -56,16 +36,8 @@ export async function login(input: { email: string, password: string }) {
         })
 
         const radonUser = await user
-        const rawName = radonUser.user.metadata?.name
-        const name = typeof rawName === "string" ? rawName : null
 
-        const appUser = await prisma.user.upsert({
-            where: { email },
-            update: { name },
-            create: { email, name }
-        })
-
-        return { ok: true as const, user: appUser }
+        return { ok: true as const, user: radonUser.user }
 
     } catch (error) {
         console.error("Login failed:", error)

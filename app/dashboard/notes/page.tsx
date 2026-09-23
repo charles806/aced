@@ -1,31 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileText, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/shell";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { NoteItem } from "@/components/dashboard/note-item";
-import type { MockNote } from "@/app/dashboard/mock-data";
+import { useSubjects } from "@/components/dashboard/use-subjects";
 import {
-  CreateNote,
+  useNotes,
+  withSubjectNames,
   type NoteWithSubjectName,
-} from "@/components/notes/create-note";
-
-function toMockNote(note: NoteWithSubjectName): MockNote {
-  return {
-    id: note.id,
-    title: note.title,
-    fileName: note.fileName ?? "",
-    subjectId: note.subjectId,
-    subjectName: note.subjectName,
-    createdAt: note.createdAt,
-  };
-}
+} from "@/components/dashboard/use-notes";
+import { NotesSection } from "@/components/notes/notes-section";
 
 export default function NotesPage() {
+  const router = useRouter();
+  const notesRef = useRef<{ openCreate: () => void }>(null);
   const [name, setName] = useState("Student");
-  const [showCreate, setShowCreate] = useState(false);
-  const [notes, setNotes] = useState<NoteWithSubjectName[]>([]);
 
   useEffect(() => {
     const stored =
@@ -36,8 +26,26 @@ export default function NotesPage() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const handleNoteCreated = (note: NoteWithSubjectName) => {
-    setNotes((previous) => [note, ...previous]);
+  const { state: subjectsState } = useSubjects();
+  const {
+    state: notesState,
+    reload: reloadNotes,
+    setNotes,
+  } = useNotes();
+
+  const readySubjects =
+    subjectsState.status === "ready" ? subjectsState.subjects : [];
+  const readyNotes = notesState.status === "ready" ? notesState.notes : [];
+  const displayNotes = withSubjectNames(readyNotes, readySubjects);
+
+  const handleNoteUpdated = (note: NoteWithSubjectName) => {
+    setNotes((previous) =>
+      previous.map((item) => (item.id === note.id ? note : item))
+    );
+  };
+
+  const handleNoteDeleted = (noteId: string) => {
+    setNotes((previous) => previous.filter((item) => item.id !== noteId));
   };
 
   return (
@@ -53,7 +61,7 @@ export default function NotesPage() {
         </div>
         <button
           type="button"
-          onClick={() => setShowCreate(true)}
+          onClick={() => notesRef.current?.openCreate()}
           className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -62,27 +70,26 @@ export default function NotesPage() {
       </div>
 
       <div className="mt-8">
-        {notes.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="No notes yet"
-            description="Upload your first study note and it will appear here, ready to review."
-            cta={{ label: "Create a note", onClick: () => setShowCreate(true) }}
-          />
-        ) : (
-          <ul className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-            {notes.map((note) => (
-              <NoteItem key={note.id} note={toMockNote(note)} />
-            ))}
-          </ul>
-        )}
+        <NotesSection
+          ref={notesRef}
+          notes={displayNotes}
+          loading={notesState.status === "loading"}
+          error={
+            notesState.status === "error"
+              ? {
+                  message: notesState.message,
+                  unauthorized: notesState.unauthorized,
+                }
+              : null
+          }
+          onRetry={() => void reloadNotes()}
+          onSignIn={() => router.push("/signin")}
+          subjects={readySubjects}
+          onCreated={(note) => setNotes((previous) => [note, ...previous])}
+          onUpdated={handleNoteUpdated}
+          onDeleted={handleNoteDeleted}
+        />
       </div>
-
-      <CreateNote
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        onCreated={handleNoteCreated}
-      />
     </DashboardShell>
   );
 }
