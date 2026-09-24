@@ -12,11 +12,15 @@ import { apiRequest } from "@/app/lib/api-client";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoteItem, NoteItemSkeleton } from "@/components/dashboard/note-item";
 import type { Subject } from "@/components/dashboard/use-subjects";
-import type { NoteWithSubjectName } from "@/components/dashboard/use-notes";
+import {
+  isWrittenNote,
+  type NoteWithSubjectName,
+} from "@/components/dashboard/use-notes";
 import { CreateNote } from "@/components/notes/create-note";
 import { EditNote } from "@/components/notes/edit-note";
 import { DeleteNote } from "@/components/notes/delete-note";
 import { NoteFileViewer } from "@/components/notes/note-file-viewer";
+import { WrittenNoteViewer } from "@/components/notes/written-note-viewer";
 
 type NoteError = { message: string; unauthorized: boolean };
 
@@ -80,6 +84,8 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
+    const [viewingWrittenNote, setViewingWrittenNote] =
+      useState<NoteWithSubjectName | null>(null);
     const [notice, setNotice] = useState<NoteNotice | null>(null);
     const noticeTimerRef = useRef<number | null>(null);
 
@@ -128,6 +134,12 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
 
     const handleView = async (note: NoteWithSubjectName) => {
       if (viewingId) return;
+
+      // Written notes: open the content viewer directly
+      if (isWrittenNote(note)) {
+        setViewingWrittenNote(note);
+        return;
+      }
 
       setViewingId(note.id);
 
@@ -229,7 +241,7 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
             description={
               hasActiveFilters
                 ? "Try a different search or clear your filters to see all your notes."
-                : "Upload your first study note and it will appear here, ready to review."
+                : "Write a note or upload a file and it will appear here, ready to review."
             }
             cta={
               hasActiveFilters
@@ -318,6 +330,13 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
             note={imagePreview.note}
             fileUrl={imagePreview.url}
             onClose={() => setImagePreview(null)}
+          />
+        ) : null}
+
+        {viewingWrittenNote ? (
+          <WrittenNoteViewer
+            note={viewingWrittenNote}
+            onClose={() => setViewingWrittenNote(null)}
           />
         ) : null}
       </div>

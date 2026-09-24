@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import {
   FileText,
   Loader2,
+  PenLine,
   Upload,
   X,
   BookOpen,
@@ -25,6 +26,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const inputClasses =
   "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-accent-400 dark:focus:ring-accent-500/20";
 
+const textareaClasses =
+  "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-accent-400 dark:focus:ring-accent-500/20 resize-none";
+
 const selectClasses =
   "w-full appearance-none rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-accent-400 dark:focus:ring-accent-500/20";
 
@@ -38,6 +42,8 @@ const bannerClasses =
 
 const secondaryButtonClasses =
   "inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800";
+
+type NoteMode = "write" | "upload";
 
 type CreateNoteProps = {
   open: boolean;
@@ -56,20 +62,24 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
 
   const { state: subjectsState, reload: reloadSubjects } = useSubjects();
 
+  const [mode, setMode] = useState<NoteMode | null>(null);
   const [title, setTitle] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
   const [errors, setErrors] = useState<{
     title?: string;
     subject?: string;
+    content?: string;
     file?: string;
   }>({});
   const [touched, setTouched] = useState<{
     title: boolean;
     subject: boolean;
+    content: boolean;
     file: boolean;
-  }>({ title: false, subject: false, file: false });
+  }>({ title: false, subject: false, content: false, file: false });
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +89,25 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
   const subjectsLoading = subjectsState.status === "loading";
   const subjectsErrorMsg =
     subjectsState.status === "error" ? subjectsState.message : null;
+
+  const resetForm = () => {
+    setMode(null);
+    setTitle("");
+    setSubjectId("");
+    setContent("");
+    setFile(null);
+    setErrors({});
+    setTouched({ title: false, subject: false, content: false, file: false });
+    setServerError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleClose = () => {
+    if (!submitting) {
+      resetForm();
+      onClose();
+    }
+  };
 
   const validateTitle = (value: string): string | undefined => {
     if (value.trim() === "") return "Please enter a note title.";
@@ -90,20 +119,34 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
     return undefined;
   };
 
+  const validateContent = (value: string): string | undefined => {
+    if (value.trim() === "") return "Please add some content to your note.";
+    return undefined;
+  };
+
   const validateFile = (value: File | null): string | undefined => {
     if (!value) return "Please select a PDF or image file.";
     return undefined;
   };
 
   const validateAll = (): boolean => {
-    const next = {
+    const next: typeof errors = {
       title: validateTitle(title),
       subject: validateSubject(subjectId),
-      file: validateFile(file),
     };
+    if (mode === "write") {
+      next.content = validateContent(content);
+    } else if (mode === "upload") {
+      next.file = validateFile(file);
+    }
     setErrors(next);
-    setTouched({ title: true, subject: true, file: true });
-    return !next.title && !next.subject && !next.file;
+    setTouched({
+      title: true,
+      subject: true,
+      content: mode === "write",
+      file: mode === "upload",
+    });
+    return !next.title && !next.subject && !!(mode === "write" ? !next.content : !next.file);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -117,7 +160,12 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
     const formData = new FormData();
     formData.append("title", title.trim());
     formData.append("subjectId", subjectId);
-    formData.append("file", file!);
+
+    if (mode === "write") {
+      formData.append("content", content.trim());
+    } else if (mode === "upload" && file) {
+      formData.append("file", file);
+    }
 
     let response: Response;
 
@@ -128,7 +176,9 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
       });
     } catch {
       setServerError(
-        "We couldn't upload your note. Please check your connection and try again."
+        mode === "upload"
+          ? "We couldn't upload your note. Please check your connection and try again."
+          : "We couldn't save your note. Please check your connection and try again."
       );
       setSubmitting(false);
       return;
@@ -179,7 +229,7 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
 
     onCreated({ ...note, subjectName });
     setSubmitting(false);
-    onClose();
+    handleClose();
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -225,13 +275,271 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
 
   const fileIsImage = file?.type.startsWith("image/") ?? false;
 
+  // Mode selection screen
+  if (mode === null) {
+    return (
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        title="Create note"
+        description="Choose how you'd like to add your study material."
+      >
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => setMode("write")}
+            disabled={subjectsLoading || subjects.length === 0}
+            className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-accent-300 hover:bg-accent-50/50 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-accent-500/40 dark:hover:bg-accent-500/5"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-50 text-accent-500 dark:bg-accent-500/10 dark:text-accent-400">
+              <PenLine className="h-5 w-5" aria-hidden="true" strokeWidth={1.75} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Write note
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Type or paste your notes directly
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode("upload")}
+            disabled={subjectsLoading || subjects.length === 0}
+            className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-accent-300 hover:bg-accent-50/50 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-accent-500/40 dark:hover:bg-accent-500/5"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-50 text-accent-500 dark:bg-accent-500/10 dark:text-accent-400">
+              <Upload className="h-5 w-5" aria-hidden="true" strokeWidth={1.75} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Upload file
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Upload a PDF or image
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {subjectsErrorMsg && !subjectsLoading ? (
+          <p className={`mt-3 ${fieldErrorClasses}`}>{subjectsErrorMsg}</p>
+        ) : null}
+      </Dialog>
+    );
+  }
+
+  // Write note form
+  if (mode === "write") {
+    return (
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        title="Write note"
+        description="Add your study notes directly."
+      >
+        <form onSubmit={handleSubmit} noValidate>
+          {serverError ? (
+            <div role="alert" className={`mb-4 ${bannerClasses}`}>
+              {serverError}
+            </div>
+          ) : null}
+
+          {/* Title */}
+          <div>
+            <label htmlFor="note-title" className={labelClasses}>
+              Title
+            </label>
+            <input
+              id="note-title"
+              type="text"
+              autoComplete="off"
+              placeholder="e.g. Integration techniques"
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                if (touched.title) {
+                  setErrors((prev) => ({
+                    ...prev,
+                    title: validateTitle(event.target.value),
+                  }));
+                }
+              }}
+              onBlur={() => {
+                setTouched((prev) => ({ ...prev, title: true }));
+                setErrors((prev) => ({ ...prev, title: validateTitle(title) }));
+              }}
+              aria-invalid={Boolean(errors.title)}
+              aria-describedby={errors.title ? "note-title-error" : undefined}
+              className={inputClasses}
+              disabled={submitting}
+              autoFocus
+            />
+            {errors.title ? (
+              <p id="note-title-error" className={fieldErrorClasses}>
+                {errors.title}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Subject */}
+          <div className="mt-4">
+            <label htmlFor="note-subject" className={labelClasses}>
+              Subject
+            </label>
+            {subjectsLoading ? (
+              <div className="h-11 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+            ) : subjects.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-5 text-center dark:border-zinc-700 dark:bg-zinc-800/50">
+                <span className="flex items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <BookOpen className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
+                  Create a subject first before adding notes.
+                </span>
+              </div>
+            ) : (
+              <div className="relative">
+                <select
+                  id="note-subject"
+                  value={subjectId}
+                  onChange={(event) => {
+                    setSubjectId(event.target.value);
+                    if (touched.subject) {
+                      setErrors((prev) => ({
+                        ...prev,
+                        subject: validateSubject(event.target.value),
+                      }));
+                    }
+                  }}
+                  onBlur={() => {
+                    setTouched((prev) => ({ ...prev, subject: true }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      subject: validateSubject(subjectId),
+                    }));
+                  }}
+                  aria-invalid={Boolean(errors.subject)}
+                  aria-describedby={
+                    errors.subject ? "note-subject-error" : undefined
+                  }
+                  className={selectClasses}
+                  disabled={submitting}
+                >
+                  <option value="">Select subject</option>
+                  {subjects.map((subject: Subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500">
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </span>
+              </div>
+            )}
+            {subjectsErrorMsg && !subjectsLoading ? (
+              <p className={fieldErrorClasses}>{subjectsErrorMsg}</p>
+            ) : null}
+            {errors.subject && !subjectsLoading && subjects.length > 0 ? (
+              <p id="note-subject-error" className={fieldErrorClasses}>
+                {errors.subject}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Content */}
+          <div className="mt-4">
+            <label htmlFor="note-content" className={labelClasses}>
+              Content
+            </label>
+            <textarea
+              id="note-content"
+              placeholder="Type or paste your notes here…"
+              rows={10}
+              value={content}
+              onChange={(event) => {
+                setContent(event.target.value);
+                if (touched.content) {
+                  setErrors((prev) => ({
+                    ...prev,
+                    content: validateContent(event.target.value),
+                  }));
+                }
+              }}
+              onBlur={() => {
+                setTouched((prev) => ({ ...prev, content: true }));
+                setErrors((prev) => ({
+                  ...prev,
+                  content: validateContent(content),
+                }));
+              }}
+              aria-invalid={Boolean(errors.content)}
+              aria-describedby={
+                errors.content ? "note-content-error" : undefined
+              }
+              className={textareaClasses}
+              disabled={submitting}
+            />
+            {errors.content ? (
+              <p id="note-content-error" className={fieldErrorClasses}>
+                {errors.content}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={submitting}
+              className={secondaryButtonClasses}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || subjects.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting ? (
+                <>
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  Saving…
+                </>
+              ) : (
+                "Create note"
+              )}
+            </button>
+          </div>
+        </form>
+      </Dialog>
+    );
+  }
+
+  // Upload file form
   return (
     <Dialog
       open={open}
-      onClose={() => {
-        if (!submitting) onClose();
-      }}
-      title="Create note"
+      onClose={handleClose}
+      title="Upload note"
       description="Upload a study note to keep it organized with your subjects."
     >
       <form onSubmit={handleSubmit} noValidate>
@@ -433,7 +741,7 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
         <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={submitting}
             className={secondaryButtonClasses}
           >

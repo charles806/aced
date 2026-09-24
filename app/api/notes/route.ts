@@ -57,9 +57,13 @@ export async function GET(req: Request) {
 
         const trimmedFileType = fileType?.trim();
         if (trimmedFileType) {
-            where.fileType = trimmedFileType.endsWith("/*")
-                ? { startsWith: trimmedFileType.slice(0, -1) }
-                : { equals: trimmedFileType };
+            if (trimmedFileType === "written") {
+                where.fileType = null;
+            } else if (trimmedFileType.endsWith("/*")) {
+                where.fileType = { startsWith: trimmedFileType.slice(0, -1) };
+            } else {
+                where.fileType = { equals: trimmedFileType };
+            }
         }
 
         const notes = await prisma.note.findMany({
@@ -96,6 +100,7 @@ export async function POST(req: Request) {
         const title = formData.get("title");
         const subjectId = formData.get("subjectId");
         const file = formData.get("file");
+        const content = formData.get("content");
 
         // Validate title
         if (typeof title !== "string" || title.trim() === "") {
@@ -105,11 +110,6 @@ export async function POST(req: Request) {
         // Validate subject ID
         if (typeof subjectId !== "string" || subjectId.trim() === "") {
             return jsonError("Subject ID is required", 400);
-        }
-
-        // Validate file
-        if (!(file instanceof File)) {
-            return jsonError("File is required", 400);
         }
 
         // Validate subject ownership
@@ -124,6 +124,38 @@ export async function POST(req: Request) {
             return jsonError("Subject not found", 404);
         }
 
+        const isFileNote = file instanceof File;
+
+        // Written note: no file, content required
+        if (!isFileNote) {
+            if (typeof content !== "string" || content.trim() === "") {
+                return jsonError(
+                    "Please add some content to your note.",
+                    400
+                );
+            }
+
+            const result = await prisma.note.create({
+                data: {
+                    title: title.trim(),
+                    content: content.trim(),
+                    userId: user.id,
+                    subjectId: subject.id,
+                },
+            });
+
+            void createActivity({
+                userId: user.id,
+                type: "note_created",
+                noteId: result.id,
+                subjectId: result.subjectId,
+                label: `Created note "${result.title}"`,
+            });
+
+            return Response.json({ note: result }, { status: 201 });
+        }
+
+        // File note: file required
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
             return jsonError("File must be 10MB or smaller", 400);
@@ -178,10 +210,7 @@ export async function POST(req: Request) {
             label: `Created note "${result.title}"`,
         });
 
-        return Response.json(
-            { note: result },
-            { status: 201 }
-        );
+        return Response.json({ note: result }, { status: 201 });
     } catch (error) {
         console.error("Create note error:", error);
 

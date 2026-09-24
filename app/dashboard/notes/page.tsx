@@ -73,7 +73,7 @@ export default function NotesPage() {
             Your notes
           </h1>
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Study notes uploaded across all your subjects.
+            Study notes across all your subjects.
           </p>
         </div>
         <button

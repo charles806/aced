@@ -19,11 +19,12 @@ export async function GET(req: Request) {
     return Response.json({
         subscription: state
             ? {
-                  plan: state.plan,
+                  isPro: state.hasProAccess,
                   status: state.status,
+                  plan: state.plan,
+                  currentPeriodStart: state.currentPeriodStart,
                   currentPeriodEnd: state.currentPeriodEnd,
                   cancelAtPeriodEnd: state.cancelAtPeriodEnd,
-                  hasProAccess: state.hasProAccess,
               }
             : null,
     });

@@ -36,7 +36,7 @@ export function UpgradeCard({ onSignIn }: UpgradeCardProps) {
   const planName = "ACED Pro";
   const periodEnd = formatPeriodEnd(subscription?.currentPeriodEnd ?? null);
   const [hasPro, isPastDue, renewalsCanceled] = [
-    subscription?.hasProAccess ?? false,
+    subscription?.isPro ?? false,
     subscription?.status === "past_due",
     subscription?.cancelAtPeriodEnd ?? false,
   ];

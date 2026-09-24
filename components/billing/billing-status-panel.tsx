@@ -47,14 +47,14 @@ export function BillingStatusPanel({ view }: BillingStatusPanelProps) {
 
   // Documented "adjust state during render" pattern (not an effect): stop
   // polling once activation is visible in real billing state.
-  if (subscription?.hasProAccess && !proActivated) {
+  if (subscription?.isPro && !proActivated) {
     setProActivated(true);
   }
 
   const periodEnd = formatPeriodEnd(subscription?.currentPeriodEnd ?? null);
 
   if (view === "success") {
-    if (subscription?.hasProAccess) {
+    if (subscription?.isPro) {
       return (
         <StatusCard
           icon={
@@ -129,7 +129,7 @@ export function BillingStatusPanel({ view }: BillingStatusPanelProps) {
   }
 
   // view === "cancelled"
-  if (subscription?.hasProAccess) {
+  if (subscription?.isPro) {
     return (
       <StatusCard
         icon={

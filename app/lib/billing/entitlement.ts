@@ -57,6 +57,7 @@ export function isEntitled(state: EntitlementFields): boolean {
 export type SubscriptionState = {
     plan: string;
     status: string;
+    currentPeriodStart: string | null;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
     hasProAccess: boolean;
@@ -71,6 +72,7 @@ export async function getSubscriptionState(
         select: {
             plan: true,
             status: true,
+            currentPeriodStart: true,
             currentPeriodEnd: true,
             cancelAtPeriodEnd: true,
         },
@@ -81,6 +83,8 @@ export async function getSubscriptionState(
     return {
         plan: subscription.plan,
         status: normalizeStatus(subscription.status),
+        currentPeriodStart:
+            subscription.currentPeriodStart?.toISOString() ?? null,
         currentPeriodEnd:
             subscription.currentPeriodEnd?.toISOString() ?? null,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,

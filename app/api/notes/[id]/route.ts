@@ -62,7 +62,7 @@ export async function PATCH(
         );
     }
 
-    const { title, subjectId } = body;
+    const { title, subjectId, content } = body;
 
     if (typeof title !== "string" || title.trim() === "") {
         return jsonError("Note title is required", 400);
@@ -95,14 +95,33 @@ export async function PATCH(
             return jsonError("Subject not found", 404);
         }
 
+        // Validate content for written notes
+        if (!note.fileUrl) {
+            if (content !== undefined && content !== null) {
+                if (typeof content !== "string" || content.trim() === "") {
+                    return jsonError(
+                        "Please add some content to your note.",
+                        400
+                    );
+                }
+            }
+        }
+
+        const updateData: { title: string; subjectId: string; content?: string } = {
+            title: title.trim(),
+            subjectId: subject.id,
+        };
+
+        // Update content for written notes
+        if (!note.fileUrl && content !== undefined && content !== null && typeof content === "string") {
+            updateData.content = content.trim();
+        }
+
         const updated = await prisma.note.update({
             where: {
                 id: note.id,
             },
-            data: {
-                title: title.trim(),
-                subjectId: subject.id,
-            },
+            data: updateData,
         });
 
         return Response.json({

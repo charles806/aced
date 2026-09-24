@@ -7,6 +7,7 @@ import { apiRequest } from "@/app/lib/api-client";
 import type { Subject } from "@/components/dashboard/use-subjects";
 import {
   withSubjectNames,
+  isWrittenNote,
   type Note,
   type NoteWithSubjectName,
 } from "@/components/dashboard/use-notes";
@@ -15,6 +16,9 @@ const TITLE_MAX_LENGTH = 200;
 
 const inputClasses =
   "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-accent-400 dark:focus:ring-accent-500/20";
+
+const textareaClasses =
+  "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-accent-400 dark:focus:ring-accent-500/20 resize-none";
 
 const selectClasses =
   "w-full appearance-none rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-accent-400 dark:focus:ring-accent-500/20";
@@ -49,9 +53,16 @@ export function EditNote({
 }: EditNoteProps) {
   const [title, setTitle] = useState(() => note?.title ?? "");
   const [subjectId, setSubjectId] = useState(() => note?.subjectId ?? "");
-  const [errors, setErrors] = useState<{ title?: string; subject?: string }>({});
+  const [content, setContent] = useState(() => note?.content ?? "");
+  const [errors, setErrors] = useState<{
+    title?: string;
+    subject?: string;
+    content?: string;
+  }>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const writtenNote = note ? isWrittenNote(note) : false;
 
   const validateTitle = (value: string): string | undefined => {
     if (value.trim() === "") return "Please enter a note title.";
@@ -66,29 +77,46 @@ export function EditNote({
     return undefined;
   };
 
+  const validateContent = (value: string): string | undefined => {
+    if (writtenNote && value.trim() === "")
+      return "Please add some content to your note.";
+    return undefined;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!note) return;
 
     const nextTitle = title.trim();
+    const nextContent = content.trim();
     const nextErrors = {
       title: validateTitle(nextTitle),
       subject: validateSubject(subjectId),
+      content: writtenNote ? validateContent(nextContent) : undefined,
     };
 
     setErrors(nextErrors);
 
-    if (nextErrors.title || nextErrors.subject) return;
+    if (nextErrors.title || nextErrors.subject || nextErrors.content) return;
 
     setSubmitting(true);
     setServerError(null);
+
+    const jsonBody: Record<string, string> = {
+      title: nextTitle,
+      subjectId,
+    };
+
+    if (writtenNote) {
+      jsonBody.content = nextContent;
+    }
 
     const result = await apiRequest<{ note: Note }>(
       `/api/notes/${note.id}`,
       {
         method: "PATCH",
-        json: { title: nextTitle, subjectId },
+        json: jsonBody,
         notFoundMessage: "That note no longer exists.",
       }
     );
@@ -129,7 +157,7 @@ export function EditNote({
       }}
       title="Edit note"
       description={
-        note ? `Update the title and subject for “${note.title}”.` : undefined
+        note ? `Update the details for "${note.title}".` : undefined
       }
     >
       <form onSubmit={handleSubmit} noValidate>
@@ -232,6 +260,38 @@ export function EditNote({
             </p>
           ) : null}
         </div>
+
+        {writtenNote ? (
+          <div className="mt-4">
+            <label htmlFor="edit-note-content" className={labelClasses}>
+              Content
+            </label>
+            <textarea
+              id="edit-note-content"
+              placeholder="Type or paste your notes here…"
+              rows={10}
+              value={content}
+              onChange={(event) => {
+                setContent(event.target.value);
+                setErrors((prev) => ({
+                  ...prev,
+                  content: validateContent(event.target.value),
+                }));
+              }}
+              aria-invalid={Boolean(errors.content)}
+              aria-describedby={
+                errors.content ? "edit-note-content-error" : undefined
+              }
+              className={textareaClasses}
+              disabled={submitting}
+            />
+            {errors.content ? (
+              <p id="edit-note-content-error" className={fieldErrorClasses}>
+                {errors.content}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
           <button

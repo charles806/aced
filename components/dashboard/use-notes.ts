@@ -34,6 +34,14 @@ export type NoteFilters = {
   fileType?: string;
 };
 
+export function isWrittenNote(note: Note): boolean {
+  return !note.fileUrl && !note.fileName && !note.fileType;
+}
+
+export function isFileNote(note: Note): boolean {
+  return Boolean(note.fileUrl || note.fileName || note.fileType);
+}
+
 type NotesStateInternal =
   | { status: "loading" }
   | {

@@ -17,6 +17,7 @@ const chevronClasses =
   "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500";
 
 const FILE_TYPE_OPTIONS = [
+  { value: "written", label: "Written" },
   { value: "application/pdf", label: "PDF" },
   { value: "image/*", label: "Image" },
 ] as const;

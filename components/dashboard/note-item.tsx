@@ -5,9 +5,13 @@ import {
   FileText,
   Loader2,
   Pencil,
+  PenLine,
   Trash2,
 } from "lucide-react";
-import type { NoteWithSubjectName } from "@/components/dashboard/use-notes";
+import {
+  isWrittenNote,
+  type NoteWithSubjectName,
+} from "@/components/dashboard/use-notes";
 
 function formatRelativeDate(iso: string): string {
   const date = new Date(iso);
@@ -57,7 +61,8 @@ export function NoteItem({
   deleting = false,
 }: NoteItemProps) {
   const showActions = Boolean(onView || onEdit || onDelete);
-  const viewable = hasAttachedFile(note);
+  const written = isWrittenNote(note);
+  const viewable = written || hasAttachedFile(note);
   const rowClickable = Boolean(onView) && viewable && !viewing && !deleting;
 
   return (
@@ -70,7 +75,11 @@ export function NoteItem({
       }`}
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-400 transition group-hover:text-accent-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500">
-        <FileText className="h-4.5 w-4.5" aria-hidden="true" strokeWidth={2} />
+        {written ? (
+          <PenLine className="h-4.5 w-4.5" aria-hidden="true" strokeWidth={2} />
+        ) : (
+          <FileText className="h-4.5 w-4.5" aria-hidden="true" strokeWidth={2} />
+        )}
       </span>
 
       <div className="min-w-0 flex-1">
@@ -78,7 +87,9 @@ export function NoteItem({
           {note.title}
         </p>
         <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-          {note.fileName ? (
+          {written ? (
+            "Written"
+          ) : note.fileName ? (
             <>
               {note.fileName}
               {fileTypeLabel(note.fileType) ? (

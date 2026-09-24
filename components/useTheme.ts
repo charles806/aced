@@ -23,12 +23,12 @@ function readSystemDark(): boolean {
 
 export function useTheme() {
   const [mode, setModeState] = useState<ThemeMode>("system");
-  const [systemDark, setSystemDark] = useState<boolean>(() =>
-    typeof window !== "undefined" ? readSystemDark() : false
-  );
+  const [systemDark, setSystemDark] = useState<boolean>(false);
 
-  // Load the stored preference after first paint so server HTML is unchanged.
+  // Load the stored preference and system dark after first paint so server
+  // HTML matches during hydration (both start with dark=false, mode="system").
   useEffect(() => {
+    setSystemDark(readSystemDark());
     const storedMode = readStoredMode();
     const frame = window.requestAnimationFrame(() =>
       setModeState(storedMode)

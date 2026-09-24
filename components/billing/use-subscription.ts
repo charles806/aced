@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { apiRequest, type ApiResult } from "@/app/lib/api-client";
 
 export type SubscriptionState = {
-  plan: string;
+  isPro: boolean;
   status: string;
+  plan: string;
+  currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
-  hasProAccess: boolean;
 };
 
 type SubscriptionPayload = {

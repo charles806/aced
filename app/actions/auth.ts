@@ -12,13 +12,34 @@ export async function signUp(input: { name: string; email: string; password: str
         throw new Error("An account with this email already exists.")
     }
 
-    const radonUser = await auth.emailPassword.signup({
-        email,
-        password: input.password,
-        metadata: { name: input.name.trim() }
+    // Also check for a stale RadonIdentity from a previous partial signup.
+    const existingIdentity = await prisma.radonIdentity.findFirst({
+        where: { provider: "email", providerAccountId: email },
     })
+    if (existingIdentity) {
+        throw new Error("An account with this email already exists.")
+    }
 
-    return { ok: true as const, user: radonUser.user }
+    try {
+        const radonUser = await auth.emailPassword.signup({
+            email,
+            password: input.password,
+            metadata: { name: input.name.trim() }
+        })
+        return { ok: true as const, user: radonUser.user }
+    } catch (error) {
+        // Handle race condition: another request created the identity between
+        // our check and the signup call.
+        if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            (error as { code?: string }).code === "P2002"
+        ) {
+            throw new Error("An account with this email already exists.")
+        }
+        throw error
+    }
 }
 
 export async function login(input: { email: string, password: string }) {
