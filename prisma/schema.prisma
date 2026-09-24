@@ -105,6 +105,16 @@ model Subscription {
   @@index([status])
 }
 
+model UserSettings {
+  userId             String   @id
+  user               RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyReminders     Boolean  @default(true)
+  productUpdates     Boolean  @default(true)
+  emailNotifications Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model WebhookEvent {
   id        String   @id @default(cuid())
   provider  String
@@ -134,6 +144,7 @@ model RadonUser {
   studySessions  StudySession[]
   activities     Activity[]
   subscription   Subscription?
+  settings       UserSettings?
 
   @@index([email])
 }
