@@ -21,6 +21,16 @@ function avatarColorClass(name: string): string {
   return AVATAR_COLOR_CLASSES[hash % AVATAR_COLOR_CLASSES.length];
 }
 
+function cardTilt(name: string): number {
+  let hash = 0;
+
+  for (let index = 0; index < name.length; index += 1) {
+    hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+  }
+
+  return (hash % 5) - 2;
+}
+
 // Rendered in UTC so SSR and client output always match.
 function formatAddedDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -52,9 +62,10 @@ export function SubjectCard({
 
   return (
     <article
-      className={`group relative rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 ${
+      className={`group paper-grain pin-dot relative rounded-2xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(24,24,27,0.04),0_8px_24px_-16px_rgba(24,24,27,0.14)] transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)] dark:hover:border-zinc-700 ${
         deleting ? "pointer-events-none opacity-50" : ""
       }`}
+      style={{ ["--sticker-angle" as string]: `${cardTilt(subject.name)}deg` }}
     >
       {showActions ? (
         <div className="absolute right-3 top-3 flex items-center gap-1">
@@ -64,7 +75,7 @@ export function SubjectCard({
               onClick={() => onEdit(subject)}
               disabled={deleting}
               aria-label={`Edit ${subject.name}`}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 disabled:cursor-not-allowed dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="inline-flex h-7 w-7 translate-y-0.5 items-center justify-center rounded-lg text-zinc-400 opacity-0 transition-all duration-200 hover:bg-zinc-100 hover:text-zinc-600 focus:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 group-hover:translate-y-0 group-hover:opacity-100 disabled:cursor-not-allowed dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
               <Pencil
                 className="h-3.5 w-3.5"
@@ -79,7 +90,7 @@ export function SubjectCard({
               onClick={() => onDelete(subject)}
               disabled={deleting}
               aria-label={`Delete ${subject.name}`}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30 disabled:cursor-not-allowed dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              className="inline-flex h-7 w-7 translate-y-0.5 items-center justify-center rounded-lg text-zinc-400 opacity-0 transition-all delay-75 duration-200 hover:bg-red-50 hover:text-red-600 focus:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30 group-hover:translate-y-0 group-hover:opacity-100 disabled:cursor-not-allowed dark:hover:bg-red-950/40 dark:hover:text-red-400"
             >
               <Trash2
                 className="h-3.5 w-3.5"
@@ -93,7 +104,7 @@ export function SubjectCard({
 
       <div className={showActions ? "flex items-center gap-3 pr-14" : "flex items-center gap-3"}>
         <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white ${avatarColorClass(
+          className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white group-hover:animate-wiggle dark:group-hover:animate-none ${avatarColorClass(
             subject.name,
           )}`}
           aria-hidden="true"
@@ -108,7 +119,7 @@ export function SubjectCard({
       </div>
 
       <p className="mt-4 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-        <CalendarDays className="h-3 w-3" aria-hidden="true" />
+        <CalendarDays className="h-3 w-3 transition-transform duration-300 group-hover:rotate-12" aria-hidden="true" />
         Added {formatAddedDate(subject.createdAt)}
       </p>
 

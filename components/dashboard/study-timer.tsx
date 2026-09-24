@@ -277,9 +277,15 @@ export function StudyTimer({
   return (
     <section
       aria-labelledby="study-timer-title"
-      className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+      className="group relative paper-grain rounded-2xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(24,24,27,0.04),0_8px_24px_-16px_rgba(24,24,27,0.14)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]"
     >
-      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+      <span
+        aria-hidden="true"
+        className="tape absolute -top-2.5 right-5 w-fit rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400"
+      >
+        focus mode
+      </span>
+      <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div className="min-w-0">
           <h2
             id="study-timer-title"
@@ -288,17 +294,25 @@ export function StudyTimer({
             Study timer
           </h2>
 
-          <p
-            role="timer"
-            aria-live="polite"
-            className={`mt-3 font-display text-4xl tabular-nums tracking-tight ${
-              status === "running"
-                ? "text-accent-600 dark:text-accent-400"
-                : "text-zinc-900 dark:text-zinc-50"
-            }`}
-          >
-            {formatClock(elapsedMs / 1000)}
-          </p>
+          <div className="relative mt-3 inline-flex">
+            {status === "running" ? (
+              <span
+                aria-hidden="true"
+                className="animate-pulse-ring absolute inset-x-[-6px] inset-y-[-6px] rounded-2xl border-2 border-accent-300/70 dark:border-accent-500/40"
+              />
+            ) : null}
+            <p
+              role="timer"
+              aria-live="polite"
+              className={`relative font-display text-4xl tabular-nums tracking-tight ${
+                status === "running"
+                  ? "text-accent-600 dark:text-accent-400"
+                  : "text-zinc-900 dark:text-zinc-50"
+              }`}
+            >
+              {formatClock(elapsedMs / 1000)}
+            </p>
+          </div>
 
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             {status === "idle" && "Pick a subject, then start focusing."}
@@ -336,7 +350,7 @@ export function StudyTimer({
                 type="button"
                 onClick={() => void handleStart()}
                 disabled={busy}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:opacity-60"
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -353,7 +367,7 @@ export function StudyTimer({
                   type="button"
                   onClick={handlePause}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-500/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:-translate-y-0.5 hover:bg-zinc-50 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-500/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
                   <Pause className="h-4 w-4" aria-hidden="true" />
                   Pause
@@ -363,7 +377,7 @@ export function StudyTimer({
                   type="button"
                   onClick={handleResume}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:opacity-60"
                 >
                   <Play className="h-4 w-4" aria-hidden="true" />
                   Resume
@@ -374,7 +388,7 @@ export function StudyTimer({
                 type="button"
                 onClick={() => void handleStop()}
                 disabled={busy}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-500/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:-translate-y-0.5 hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-500/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

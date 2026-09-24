@@ -37,11 +37,17 @@ export function Topbar({ name }: { name: string }) {
     <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
       <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <Link href="/dashboard" className="lg:hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 focus-visible:rounded-lg">
-            <LogoMark />
+          <Link href="/dashboard" className="group lg:hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 focus-visible:rounded-lg">
+            <span className="inline-block transition-transform duration-300 group-hover:rotate-[-6deg]">
+              <LogoMark />
+            </span>
           </Link>
-          <h1 className="hidden font-display text-lg font-semibold text-zinc-900 lg:block dark:text-zinc-50">
+          <h1 className="pin-dot relative hidden font-display text-lg font-semibold text-zinc-900 lg:block dark:text-zinc-50">
             {getNavItemLabel(pathname)}
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-1 left-0 h-2 w-10 -rotate-1 rounded-sm bg-accent-200/60 dark:bg-accent-500/25"
+            />
           </h1>
           <span className="font-display text-lg font-semibold text-zinc-900 lg:hidden dark:text-zinc-50">
             ACED
@@ -53,9 +59,9 @@ export function Topbar({ name }: { name: string }) {
           <button
             type="button"
             aria-label="Notifications (coming soon)"
-            className="hidden h-9 w-9 items-center justify-center rounded-full border border-zinc-300/70 bg-white/70 text-zinc-500 transition hover:text-zinc-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 sm:inline-flex dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-400 dark:hover:text-white"
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-zinc-300/70 bg-white/70 text-zinc-500 transition-all duration-200 hover:-translate-y-0.5 hover:text-zinc-900 hover:shadow-sm active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 sm:inline-flex dark:border-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-400 dark:hover:text-white"
           >
-            <Bell className="h-4 w-4" aria-hidden="true" />
+            <Bell className="h-4 w-4 animate-float dark:animate-none" aria-hidden="true" style={{ ["--tilt" as string]: "0deg" }} />
           </button>
 
           <ThemeToggle dark={dark} onToggle={toggle} />
@@ -67,7 +73,7 @@ export function Topbar({ name }: { name: string }) {
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-label="Account menu"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-sm font-semibold text-white transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:rotate-[3deg] hover:bg-accent-600 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30"
             >
               {(name || "S").charAt(0).toUpperCase()}
             </button>

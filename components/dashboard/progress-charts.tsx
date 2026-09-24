@@ -47,12 +47,15 @@ function WeekChart({ stats }: { stats: StudyStats }) {
             <div className="flex h-28 w-full items-end justify-center">
               <span
                 aria-hidden="true"
-                className={`w-full max-w-8 rounded-t-md ${
+                className={`w-full max-w-8 rounded-t-md animate-grow-up ${
                   day.ms > 0
                     ? "bg-accent-500"
                     : "bg-zinc-200 dark:bg-zinc-800"
                 }`}
-                style={{ height: `${height}%` }}
+                style={{
+                  height: `${height}%`,
+                  animationDelay: `${index * 70}ms`,
+                }}
               />
             </div>
             <span className="text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
@@ -99,8 +102,13 @@ function SubjectChart({ stats }: { stats: StudyStats }) {
             aria-label={`${item.subjectName}: ${formatDuration(item.ms / 1000)}`}
           >
             <div
-              className="h-full rounded-full bg-accent-500"
-              style={{ width: `${Math.max(4, (item.ms / maxMs) * 100)}%` }}
+              className="h-full rounded-full bg-accent-500 animate-grow-width"
+              style={{
+                ["--grow-width" as string]: `${Math.max(
+                  4,
+                  (item.ms / maxMs) * 100,
+                )}%`,
+              }}
             />
           </div>
         </div>
@@ -117,15 +125,21 @@ export function ProgressCharts({ stats }: { stats: StudyStats }) {
     <div className="grid gap-6 sm:grid-cols-2">
       <section
         aria-labelledby="study-time-title"
-        className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+        className="group relative paper-grain rounded-2xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(24,24,27,0.04),0_8px_24px_-16px_rgba(24,24,27,0.14)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]"
       >
+        <span
+          aria-hidden="true"
+          className="tape absolute -top-3 right-6 w-fit rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400"
+        >
+          this week
+        </span>
         <h3
           id="study-time-title"
-          className="font-display text-base font-semibold text-zinc-900 dark:text-zinc-50"
+          className="relative font-display text-base font-semibold text-zinc-900 dark:text-zinc-50"
         >
           Study time
         </h3>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="relative mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
           Hours studied this week
         </p>
         {weekHasData ? (
@@ -141,15 +155,15 @@ export function ProgressCharts({ stats }: { stats: StudyStats }) {
 
       <section
         aria-labelledby="completion-title"
-        className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+        className="relative paper-grain rounded-2xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(24,24,27,0.04),0_8px_24px_-16px_rgba(24,24,27,0.14)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]"
       >
         <h3
           id="completion-title"
-          className="font-display text-base font-semibold text-zinc-900 dark:text-zinc-50"
+          className="relative font-display text-base font-semibold text-zinc-900 dark:text-zinc-50"
         >
           Study time by subject
         </h3>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="relative mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
           Time spent per subject
         </p>
         {subjectsHaveData ? (

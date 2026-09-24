@@ -13,6 +13,7 @@ import {
 } from "@/components/dashboard/use-notes";
 import { NotesFilters } from "@/components/notes/notes-filters";
 import { NotesSection } from "@/components/notes/notes-section";
+import { Reveal } from "@/components/marketing/reveal";
 
 export default function NotesPage() {
   const router = useRouter();
@@ -67,57 +68,63 @@ export default function NotesPage() {
 
   return (
     <DashboardShell name={name}>
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50">
-            Your notes
-          </h1>
-          <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Study notes across all your subjects.
-          </p>
+      <Reveal direction="up">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50">
+              Your notes
+            </h1>
+            <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+              Study notes across all your subjects.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => notesRef.current?.openCreate()}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            New note
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => notesRef.current?.openCreate()}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          New note
-        </button>
-      </div>
+      </Reveal>
 
-      <div className="mt-6">
-        <NotesFilters
-          filters={filters}
-          subjects={readySubjects}
-          onChange={handleFiltersChange}
-          onClear={handleClearFilters}
-        />
-      </div>
+      <Reveal direction="down" delay={0.05}>
+        <div className="mt-6">
+          <NotesFilters
+            filters={filters}
+            subjects={readySubjects}
+            onChange={handleFiltersChange}
+            onClear={handleClearFilters}
+          />
+        </div>
+      </Reveal>
 
-      <div className="mt-6">
-        <NotesSection
-          ref={notesRef}
-          notes={displayNotes}
-          loading={notesState.status === "loading"}
-          error={
-            notesState.status === "error"
-              ? {
-                  message: notesState.message,
-                  unauthorized: notesState.unauthorized,
-                }
-              : null
-          }
-          onRetry={() => void reloadNotes()}
-          onSignIn={() => router.push("/signin")}
-          subjects={readySubjects}
-          onCreated={handleNoteCreated}
-          onUpdated={handleNoteUpdated}
-          onDeleted={handleNoteDeleted}
-          hasActiveFilters={hasActiveFilters}
-          onClearFilters={handleClearFilters}
-        />
-      </div>
+      <Reveal direction="up" delay={0.1}>
+        <div className="mt-6">
+          <NotesSection
+            ref={notesRef}
+            notes={displayNotes}
+            loading={notesState.status === "loading"}
+            error={
+              notesState.status === "error"
+                ? {
+                    message: notesState.message,
+                    unauthorized: notesState.unauthorized,
+                  }
+                : null
+            }
+            onRetry={() => void reloadNotes()}
+            onSignIn={() => router.push("/signin")}
+            subjects={readySubjects}
+            onCreated={handleNoteCreated}
+            onUpdated={handleNoteUpdated}
+            onDeleted={handleNoteDeleted}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={handleClearFilters}
+          />
+        </div>
+      </Reveal>
     </DashboardShell>
   );
 }

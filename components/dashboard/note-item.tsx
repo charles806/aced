@@ -8,6 +8,7 @@ import {
   PenLine,
   Trash2,
 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   isWrittenNote,
   type NoteWithSubjectName,
@@ -43,6 +44,8 @@ function hasAttachedFile(note: NoteWithSubjectName): boolean {
 const actionButtonClasses =
   "inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-300";
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 type NoteItemProps = {
   note: NoteWithSubjectName;
   onView?: (note: NoteWithSubjectName) => void;
@@ -60,21 +63,30 @@ export function NoteItem({
   viewing = false,
   deleting = false,
 }: NoteItemProps) {
+  const reduced = useReducedMotion();
   const showActions = Boolean(onView || onEdit || onDelete);
   const written = isWrittenNote(note);
   const viewable = written || hasAttachedFile(note);
   const rowClickable = Boolean(onView) && viewable && !viewing && !deleting;
 
   return (
-    <li
+    <motion.li
       onClick={() => {
         if (rowClickable && onView) onView(note);
       }}
-      className={`group relative flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
+      variants={{
+        hidden: { opacity: 0, x: reduced ? 0 : 10 },
+        show: {
+          opacity: 1,
+          x: 0,
+          transition: { duration: 0.4, ease: EASE },
+        },
+      }}
+      className={`group relative flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-[background-color,translate] hover:translate-x-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
         rowClickable ? "cursor-pointer" : ""
       }`}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-400 transition group-hover:text-accent-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-400 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-accent-200 group-hover:text-accent-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500 dark:group-hover:border-accent-500/40">
         {written ? (
           <PenLine className="h-4.5 w-4.5" aria-hidden="true" strokeWidth={2} />
         ) : (
@@ -105,7 +117,7 @@ export function NoteItem({
         </p>
       </div>
 
-      <span className="shrink-0 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
+      <span className="tape relative shrink-0 rounded-md bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
         {note.subjectName}
       </span>
 
@@ -199,7 +211,7 @@ export function NoteItem({
           />
         </div>
       ) : null}
-    </li>
+    </motion.li>
   );
 }
 

@@ -12,6 +12,8 @@ import {
 } from "@/components/dashboard/subject-card";
 import { apiRequest } from "@/app/lib/api-client";
 import { useSubjects, type Subject } from "@/components/dashboard/use-subjects";
+import { Reveal } from "@/components/marketing/reveal";
+import { Stagger, StaggerItem } from "@/components/marketing/stagger";
 
 type ActiveDialog =
   | { kind: "create" }
@@ -214,71 +216,78 @@ export default function SubjectsPage() {
 
     if (state.status === "error") {
       return (
-        <EmptyState
-          icon={AlertCircle}
-          title="Couldn't load your subjects"
-          description={state.message}
-          cta={{
-            label: state.unauthorized ? "Sign in again" : "Try again",
-            onClick: () => {
-              if (state.unauthorized) {
-                router.push("/signin");
-                return;
-              }
-              void reload();
-            },
-          }}
-        />
+        <Reveal direction="scale">
+          <EmptyState
+            icon={AlertCircle}
+            title="Couldn't load your subjects"
+            description={state.message}
+            cta={{
+              label: state.unauthorized ? "Sign in again" : "Try again",
+              onClick: () => {
+                if (state.unauthorized) {
+                  router.push("/signin");
+                  return;
+                }
+                void reload();
+              },
+            }}
+          />
+        </Reveal>
       );
     }
 
     if (state.subjects.length === 0) {
       return (
-        <EmptyState
-          icon={BookOpen}
-          title="No subjects yet"
-          description="Add your first subject to start tracking progress across your studies."
-          cta={{ label: "Add a subject", onClick: openCreate }}
-        />
+        <Reveal direction="scale">
+          <EmptyState
+            icon={BookOpen}
+            title="No subjects yet"
+            description="Add your first subject to start tracking progress across your studies."
+            cta={{ label: "Add a subject", onClick: openCreate }}
+          />
+        </Reveal>
       );
     }
 
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" stagger={0.06}>
         {state.subjects.map((subject) => (
-          <SubjectCard
-            key={subject.id}
-            subject={subject}
-            onEdit={openEdit}
-            onDelete={openDelete}
-            deleting={deletingId === subject.id}
-          />
+          <StaggerItem key={subject.id}>
+            <SubjectCard
+              subject={subject}
+              onEdit={openEdit}
+              onDelete={openDelete}
+              deleting={deletingId === subject.id}
+            />
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     );
   };
 
   return (
     <DashboardShell name={name}>
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50">
-            Your subjects
-          </h1>
-          <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Organize your studies one subject at a time.
-          </p>
+      <Reveal direction="up">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50">
+              Your subjects
+            </h1>
+            <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+              Organize your studies one subject at a time.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={state.status === "loading"}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            New subject
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          disabled={state.status === "loading"}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          New subject
-        </button>
-      </div>
+      </Reveal>
 
       {sectionError ? (
         <div role="alert" className={`mt-6 ${bannerClasses}`}>
@@ -286,7 +295,9 @@ export default function SubjectsPage() {
         </div>
       ) : null}
 
-      <div className="mt-8">{renderContent()}</div>
+      <Reveal direction="up" delay={0.08}>
+        <div className="mt-8">{renderContent()}</div>
+      </Reveal>
 
       {/* Create / edit */}
       <Dialog

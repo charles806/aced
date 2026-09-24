@@ -7,10 +7,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { AlertCircle, FileText, SearchX, X } from "lucide-react";
+import {
+  AlertCircle,
+  FileText,
+  SearchX,
+  X,
+} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { apiRequest } from "@/app/lib/api-client";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoteItem, NoteItemSkeleton } from "@/components/dashboard/note-item";
+import { Reveal } from "@/components/marketing/reveal";
 import type { Subject } from "@/components/dashboard/use-subjects";
 import {
   isWrittenNote,
@@ -88,6 +95,7 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
       useState<NoteWithSubjectName | null>(null);
     const [notice, setNotice] = useState<NoteNotice | null>(null);
     const noticeTimerRef = useRef<number | null>(null);
+    const reduced = useReducedMotion();
 
     useImperativeHandle(ref, () => ({ openCreate: () => setCreateOpen(true) }), []);
 
@@ -215,45 +223,57 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
 
       if (error) {
         return (
-          <EmptyState
-            icon={AlertCircle}
-            title="Couldn't load your notes"
-            description={error.message}
-            cta={{
-              label: error.unauthorized ? "Sign in again" : "Try again",
-              onClick: () => {
-                if (error.unauthorized) {
-                  onSignIn();
-                  return;
-                }
-                onRetry();
-              },
-            }}
-          />
+          <Reveal direction="scale">
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load your notes"
+              description={error.message}
+              cta={{
+                label: error.unauthorized ? "Sign in again" : "Try again",
+                onClick: () => {
+                  if (error.unauthorized) {
+                    onSignIn();
+                    return;
+                  }
+                  onRetry();
+                },
+              }}
+            />
+          </Reveal>
         );
       }
 
       if (notes.length === 0) {
         return (
-          <EmptyState
-            icon={hasActiveFilters ? SearchX : FileText}
-            title={hasActiveFilters ? "No notes found" : "No notes yet"}
-            description={
-              hasActiveFilters
-                ? "Try a different search or clear your filters to see all your notes."
-                : "Write a note or upload a file and it will appear here, ready to review."
-            }
-            cta={
-              hasActiveFilters
-                ? { label: "Clear filters", onClick: () => onClearFilters?.() }
-                : { label: "New note", onClick: () => setCreateOpen(true) }
-            }
-          />
+          <Reveal direction="scale">
+            <EmptyState
+              icon={hasActiveFilters ? SearchX : FileText}
+              title={hasActiveFilters ? "No notes found" : "No notes yet"}
+              description={
+                hasActiveFilters
+                  ? "Try a different search or clear your filters to see all your notes."
+                  : "Write a note or upload a file and it will appear here, ready to review."
+              }
+              cta={
+                hasActiveFilters
+                  ? { label: "Clear filters", onClick: () => onClearFilters?.() }
+                  : { label: "New note", onClick: () => setCreateOpen(true) }
+              }
+            />
+          </Reveal>
         );
       }
 
       return (
-        <ul className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+        <motion.ul
+          className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
+          initial={reduced ? false : "hidden"}
+          animate="show"
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.05 } },
+          }}
+        >
           {notes.map((note) => (
             <NoteItem
               key={note.id}
@@ -265,7 +285,7 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
               deleting={deletingId === note.id}
             />
           ))}
-        </ul>
+        </motion.ul>
       );
     };
 

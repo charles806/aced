@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import SignupForm from "@/components/SignupForm";
 
 export const metadata: Metadata = {
-  title: "Sign up | Aced",
+  title: "Sign up",
   description:
-    "Create your Aced account to keep every note, flashcard, and revision plan in one quiet, organized place.",
+    "Create your free ACED account to keep notes, subjects and study sessions organized in one quiet place.",
 };
 
 export default function SignupPage() {

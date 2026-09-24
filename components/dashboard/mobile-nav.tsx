@@ -27,17 +27,25 @@ export function MobileNav() {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 rounded-xl px-2 pb-1.5 pt-2.5 text-[10px] font-medium transition focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 ${
+                className={`group flex flex-col items-center gap-1 rounded-xl px-2 pb-1.5 pt-2.5 text-[10px] font-medium transition-all active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 ${
                   active
                     ? "text-accent-600 dark:text-accent-400"
                     : "text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
                 }`}
               >
-                <item.icon
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                  strokeWidth={active ? 2.25 : 2}
-                />
+                <span
+                  className={`rounded-lg px-2 py-0.5 transition-all ${
+                    active
+                      ? "bg-accent-50 dark:bg-accent-500/10"
+                      : "group-hover:bg-zinc-100 dark:group-hover:bg-zinc-800"
+                  }`}
+                >
+                  <item.icon
+                    className={`h-5 w-5 transition-transform duration-200 ${active ? "scale-110" : "group-hover:scale-110"}`}
+                    aria-hidden="true"
+                    strokeWidth={active ? 2.25 : 2}
+                  />
+                </span>
                 {item.label}
               </Link>
             </li>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" role="img" aria-labelledby="title">
+<title id="title">ACED flashcards preview</title>
+<defs>
+  <style>
+    .paper { fill: #fdfaf4; }
+    .window-stroke { stroke: #e7e0d2; }
+    .card { fill: #ffffff; stroke: #ece6da; }
+    .ink { fill: #37373d; }
+    .ink-soft { fill: #9b9ba3; }
+    .accent { fill: #ff4e88; }
+    .accent-soft { fill: #ffe3ec; }
+    .accent-ink { fill: #c81f58; }
+    .serif { font-family: Georgia, "Playfair Display", serif; }
+    .sans { font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
+  </style>
+</defs>
+
+<rect x="20" y="20" width="1160" height="740" rx="24" class="paper window-stroke" stroke-width="1.5"/>
+<rect x="20" y="20" width="1160" height="52" rx="24" fill="#ffffff" class="window-stroke" stroke-width="1.5"/>
+<rect x="20" y="48" width="1160" height="24" fill="#ffffff"/>
+<circle cx="52" cy="46" r="6" fill="#ff4e88"/>
+<circle cx="78" cy="46" r="6" fill="#fecaca" opacity="0.9"/>
+<circle cx="104" cy="46" r="6" fill="#fde68a" opacity="0.9"/>
+<text x="600" y="47" class="sans ink-soft" font-size="13" text-anchor="middle">Flashcards</text>
+
+<!-- flashcard back card -->
+<rect x="120" y="210" width="460" height="360" rx="20" fill="#f3ece1" transform="rotate(-6 350 390)"/>
+<rect x="120" y="210" width="460" height="360" rx="20" fill="none" transform="rotate(-6 350 390)"/>
+<text x="350" y="360" class="serif ink" font-size="22" font-weight="700" text-anchor="middle" transform="rotate(-6 350 390)">What is osmosis?</text>
+<text x="350" y="392" class="sans ink-soft" font-size="13" text-anchor="middle" transform="rotate(-6 350 390)">tap to reveal</text>
+<circle cx="124" cy="566" r="12" fill="rgba(255,78,136,0.85)" transform="rotate(-6 350 390)"/>
+
+<!-- flashcard front card -->
+<rect x="160" y="150" width="460" height="360" rx="20" class="card" transform="rotate(-1.4 390 330)"/>
+<rect x="160" y="150" width="460" height="360" rx="20" fill="none" transform="rotate(-1.4 390 330)"/>
+<text x="390" y="292" class="serif ink" font-size="24" font-weight="700" text-anchor="middle">Osmosis is the net</text>
+<text x="390" y="328" class="serif ink" font-size="24" font-weight="700" text-anchor="middle">movement of water across</text>
+<text x="390" y="364" class="serif ink" font-size="24" font-weight="700" text-anchor="middle">a membrane.</text>
+<text x="390" y="446" class="sans ink-soft" font-size="13" text-anchor="middle">Biology · deck 3 · card 12 of 24</text>
+<rect x="300" y="472" width="180" height="34" rx="17" class="accent-soft"/>
+<text x="390" y="494" class="sans accent-ink" font-size="12" font-weight="600" text-anchor="middle">Got it</text>
+<circle cx="160" cy="504" r="11" fill="rgba(255,78,136,0.85)"/>
+
+<!-- side annotation -->
+<rect x="700" y="210" width="400" height="300" rx="18" class="card" transform="rotate(2 900 360)"/>
+<text x="732" y="258" class="serif ink" font-size="20" font-weight="700">AI-made from your notes</text>
+<text x="732" y="292" class="sans ink-soft" font-size="14">Flashcards are generated straight from</text>
+<text x="732" y="312" class="sans ink-soft" font-size="14">what you upload — so you study the</text>
+<text x="732" y="332" class="sans ink-soft" font-size="14">material you actually own.</text>
+<rect x="732" y="360" width="120" height="6" rx="3" class="accent"/>
+<text x="732" y="398" class="sans ink" font-size="13" font-weight="600">Question → answer · flip to check</text>
+<text x="732" y="420" class="sans ink-soft" font-size="13">Mark the ones you know</text>
+<text x="732" y="442" class="sans ink-soft" font-size="13">and revisit the rest.</text>
+<rect x="880" y="480" width="190" height="70" rx="14" fill="#ffffff" transform="rotate(-3 975 515)" stroke="#ece6da" stroke-width="1"/>
+<rect x="955" y="470" width="54" height="15" rx="2" fill="rgba(255,78,136,0.18)" transform="rotate(1 982 478)"/>
+<text x="900" y="516" class="sans accent-ink" font-size="12" font-weight="600">flip me →</text>
+</svg>

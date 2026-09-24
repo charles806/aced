@@ -1,13 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { signUp } from "@/app/actions/auth";
-import { useTheme } from "./useTheme";
-import { LogoMark } from "./logo-mark";
-import { ThemeToggle } from "./theme-toggle";
+import { AuthAside } from "./AuthAside";
 
 type FieldName = "name" | "email" | "password";
 type FormErrors = Partial<Record<FieldName, string>>;
@@ -50,7 +47,6 @@ const errorClasses = "mt-1.5 text-xs text-red-600 dark:text-red-400";
 
 export default function SignupForm() {
   const router = useRouter();
-  const { dark, toggle } = useTheme();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -127,47 +123,9 @@ export default function SignupForm() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-zinc-50 lg:grid lg:grid-cols-[1.05fr_1fr] lg:bg-zinc-50 dark:bg-zinc-950">
-      <aside className="relative flex flex-col overflow-hidden bg-linear-to-br from-accent-100 via-rose-50 to-amber-50 px-6 pb-8 pt-6 sm:px-10 lg:px-12 lg:py-10">
-        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-accent-300/40 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -right-20 h-80 w-80 rounded-full bg-orange-300/40 blur-3xl" />
-        <div className="pointer-events-none absolute right-1/4 top-1/3 h-40 w-40 rounded-full bg-pink-300/30 blur-2xl" />
+      <AuthAside />
 
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <LogoMark />
-            <span className="font-display text-xl font-semibold text-zinc-900">
-              Aced
-            </span>
-          </div>
-          <ThemeToggle dark={dark} onToggle={toggle} />
-        </div>
-
-        <div className="relative mx-auto mt-6 w-full max-w-70 sm:max-w-sm lg:mt-10 lg:max-w-md">
-          <Image
-            src="/LearningLogin.svg"
-            alt="Animated illustration of an open book surrounded by floating school supplies"
-            width={1080}
-            height={1080}
-            unoptimized
-            draggable={false}
-            className="h-auto w-full select-none"
-          />
-        </div>
-
-        <div className="relative mt-6 lg:mt-auto lg:pt-10">
-          <p className="font-display text-2xl font-semibold leading-snug text-zinc-900 sm:text-3xl">
-            Your knowledge,
-            <br />
-            safely kept.
-          </p>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-600">
-            Aced keeps every note, flashcard, and revision plan in one
-            quiet, organized place.
-          </p>
-        </div>
-      </aside>
-
-      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-8">
+      <main className="order-first flex flex-1 items-center justify-center px-4 py-12 sm:px-8 lg:order-none">
         <div className="w-full max-w-md">
           <h1 className="font-display text-3xl font-semibold text-zinc-900 dark:text-zinc-50">
             Create your account

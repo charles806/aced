@@ -18,6 +18,7 @@
     "@radonsdk/payments": "^0.1.0",
     "@radonsdk/storage": "^0.1.1",
     "argon2": "^0.45.1",
+    "framer-motion": "^13.4.3",
     "lucide-react": "^1.33.0",
     "next": "16.3.1",
     "pg": "^8.23.0",

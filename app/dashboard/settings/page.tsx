@@ -12,6 +12,7 @@ import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { NotificationSettings } from "@/components/settings/notification-settings";
 import { AccountSection } from "@/components/settings/account-section";
 import { DangerZone } from "@/components/settings/danger-zone";
+import { Reveal } from "@/components/marketing/reveal";
 
 const SKELETON_CLASSES =
   "rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900";
@@ -99,9 +100,10 @@ export default function SettingsPage() {
     }
   };
 
-  const sections =
-    status === "ready" && user ? (
-      <>
+const sections =
+  status === "ready" && user ? (
+    <>
+      <Reveal direction="up">
         <SettingsSection
           id="profile"
           title="Profile"
@@ -113,12 +115,16 @@ export default function SettingsPage() {
             onUnauthorized={handleUnauthorized}
           />
         </SettingsSection>
+      </Reveal>
 
+      <Reveal direction="up" delay={0.05}>
         <SettingsSection id="appearance" title="Appearance">
           <AppearanceSettings />
         </SettingsSection>
+      </Reveal>
 
-        {settings ? (
+      {settings ? (
+        <Reveal direction="up" delay={0.1}>
           <SettingsSection
             id="notifications"
             title="Notifications"
@@ -129,8 +135,10 @@ export default function SettingsPage() {
               onUnauthorized={handleUnauthorized}
             />
           </SettingsSection>
-        ) : null}
+        </Reveal>
+      ) : null}
 
+      <Reveal direction="up" delay={0.15}>
         <SettingsSection
           id="account"
           title="Account"
@@ -138,7 +146,9 @@ export default function SettingsPage() {
         >
           <AccountSection user={user} onUnauthorized={handleUnauthorized} />
         </SettingsSection>
+      </Reveal>
 
+      <Reveal direction="up" delay={0.2}>
         <SettingsSection
           id="subscription"
           title="Subscription"
@@ -146,7 +156,9 @@ export default function SettingsPage() {
         >
           <UpgradeCard onSignIn={() => router.replace("/signin")} />
         </SettingsSection>
+      </Reveal>
 
+      <Reveal direction="up" delay={0.25}>
         <SettingsSection
           id="danger-zone"
           title="Danger Zone"
@@ -154,8 +166,9 @@ export default function SettingsPage() {
         >
           <DangerZone name={name} />
         </SettingsSection>
-      </>
-    ) : null;
+      </Reveal>
+    </>
+  ) : null;
 
   return (
     <DashboardShell name={name}>

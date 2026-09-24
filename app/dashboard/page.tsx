@@ -26,6 +26,8 @@ import { formatDuration } from "@/app/lib/format";
 import { useSubjects } from "@/components/dashboard/use-subjects";
 import { useNotes, withSubjectNames } from "@/components/dashboard/use-notes";
 import { NotesSection } from "@/components/notes/notes-section";
+import { Reveal } from "@/components/marketing/reveal";
+import { Stagger, StaggerItem } from "@/components/marketing/stagger";
 
 function SectionHeading({
   title,
@@ -108,6 +110,7 @@ export default function DashboardPage() {
             : "",
       sample: false,
       skeleton: progressState.status === "loading",
+      annotation: "your week",
     },
     {
       id: "streak",
@@ -127,6 +130,7 @@ export default function DashboardPage() {
             : "",
       sample: false,
       skeleton: progressState.status === "loading",
+      annotation: undefined,
     },
     {
       id: "subjects",
@@ -136,6 +140,7 @@ export default function DashboardPage() {
       hint: "in progress",
       sample: false,
       skeleton: subjectsState.status === "loading",
+      annotation: undefined,
     },
     {
       id: "notes",
@@ -145,215 +150,244 @@ export default function DashboardPage() {
       hint: "across subjects",
       sample: false,
       skeleton: notesState.status === "loading",
+      annotation: undefined,
     },
   ];
 
   return (
     <DashboardShell name={name}>
-      <section aria-labelledby="greeting-heading">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h1
-              id="greeting-heading"
-              className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50"
+      <Reveal direction="up">
+        <section aria-labelledby="greeting-heading">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <h1
+                id="greeting-heading"
+                className="font-display text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-50"
+              >
+                {greeting}
+              </h1>
+              <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                Keep building momentum. A little progress today goes a long way.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleNewNote}
+              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-accent-500/30 transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-md hover:shadow-accent-500/30 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 sm:self-auto"
             >
-              {greeting}
-            </h1>
-            <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              Keep building momentum. A little progress today goes a long way.
-            </p>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              New note
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleNewNote}
-            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-accent-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 sm:self-auto"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            New note
-          </button>
-        </div>
-      </section>
+        </section>
+      </Reveal>
 
       <section aria-label="Overview statistics" className="mt-8">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stagger
+          className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+          stagger={0.08}
+          amount={0.3}
+        >
           {statCards.map((stat) => (
-            <StatCard
-              key={stat.id}
-              icon={stat.icon}
-              label={stat.label}
-              value={stat.value}
-              hint={stat.hint}
-              sample={stat.sample}
-              skeleton={stat.skeleton}
-            />
+            <StaggerItem key={stat.id}>
+              <StatCard
+                icon={stat.icon}
+                label={stat.label}
+                value={stat.value}
+                hint={stat.hint}
+                sample={stat.sample}
+                skeleton={stat.skeleton}
+                annotation={stat.annotation}
+              />
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </section>
 
-      <section aria-labelledby="study-timer-title" className="mt-10">
-        <StudyTimer
-          subjects={readySubjects}
-          onSessionSaved={() => void reloadProgress()}
-          onSignIn={() => router.push("/signin")}
-        />
-      </section>
-
-      <section aria-label="AI Tutor" className="mt-10">
-        <AITutorCard />
-      </section>
-
-      <section
-        aria-labelledby="subjects-heading"
-        className="mt-10 cursor-pointer"
-      >
-        <SectionHeading title="Your subjects">
-          {subjectsState.status === "ready" ? (
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              {subjectsState.subjects.length}{" "}
-              {subjectsState.subjects.length === 1 ? "subject" : "subjects"}
-            </span>
-          ) : null}
-        </SectionHeading>
-        {subjectsState.status === "loading" ? (
-          <div
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-            aria-hidden="true"
-          >
-            {[0, 1, 2, 3].map((index) => (
-              <SubjectCardSkeleton key={index} />
-            ))}
-          </div>
-        ) : subjectsState.status === "error" ? (
-          <EmptyState
-            icon={AlertCircle}
-            title="Couldn't load your subjects"
-            description={subjectsState.message}
-            cta={{
-              label: subjectsState.unauthorized ? "Sign in again" : "Try again",
-              onClick: () => {
-                if (subjectsState.unauthorized) {
-                  router.push("/signin");
-                  return;
-                }
-                void reloadSubjects();
-              },
-            }}
+      <Reveal direction="up" delay={0.08}>
+        <section aria-labelledby="study-timer-title" className="mt-10">
+          <StudyTimer
+            subjects={readySubjects}
+            onSessionSaved={() => void reloadProgress()}
+            onSignIn={() => router.push("/signin")}
           />
-        ) : subjectsState.subjects.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {subjectsState.subjects.map((subject) => (
-              <SubjectCard key={subject.id} subject={subject} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={BookOpen}
-            title="No subjects yet"
-            description="Add your first subject to start tracking progress across your studies."
-            cta={{
-              label: "Add a subject",
-              onClick: () => router.push("/dashboard/subjects"),
-            }}
-          />
-        )}
-      </section>
+        </section>
+      </Reveal>
 
-      <section aria-label="Progress" className="mt-10">
-        <SectionHeading title="Progress" />
-        {progressState.status === "loading" ? (
-          <div className="grid gap-6 sm:grid-cols-2" aria-hidden="true">
-            {[0, 1].map((index) => (
-              <div
-                key={index}
-                className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
-                <div className="mt-1.5 h-3 w-36 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-                <div className="mt-6 h-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-              </div>
-            ))}
-          </div>
-        ) : progressState.status === "error" ? (
-          <EmptyState
-            icon={AlertCircle}
-            title="Couldn't load your progress"
-            description={progressState.message}
-            cta={{
-              label: progressState.unauthorized ? "Sign in again" : "Try again",
-              onClick: () => {
-                if (progressState.unauthorized) {
-                  router.push("/signin");
-                  return;
-                }
-                void reloadProgress();
-              },
-            }}
-          />
-        ) : (
-          <ProgressCharts stats={progressState.stats} />
-        )}
-      </section>
+      <Reveal direction="left" delay={0.05}>
+        <section aria-label="AI Tutor" className="mt-10">
+          <AITutorCard />
+        </section>
+      </Reveal>
 
-      <section aria-labelledby="activity-heading" className="mt-10">
-        <SectionHeading title="Recent activity" />
-        {progressState.status === "loading" ? (
-          <ul
-            className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-            aria-hidden="true"
-          >
-            {[0, 1, 2, 3].map((index) => (
-              <li
-                key={index}
-                className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 last:border-b-0 dark:border-zinc-800"
-              >
-                <div className="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
-                <div className="h-3 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-              </li>
-            ))}
-          </ul>
-        ) : progressState.status === "error" ? (
-          <EmptyState
-            icon={AlertCircle}
-            title="Couldn't load your activity"
-            description={progressState.message}
-            cta={{
-              label: progressState.unauthorized ? "Sign in again" : "Try again",
-              onClick: () => {
-                if (progressState.unauthorized) {
-                  router.push("/signin");
-                  return;
-                }
-                void reloadProgress();
-              },
-            }}
-          />
-        ) : (
-          <ActivityFeed items={progressState.activity} />
-        )}
-      </section>
+      <Reveal direction="up">
+        <section
+          aria-labelledby="subjects-heading"
+          className="mt-10 cursor-pointer"
+        >
+          <SectionHeading title="Your subjects">
+            {subjectsState.status === "ready" ? (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {subjectsState.subjects.length}{" "}
+                {subjectsState.subjects.length === 1 ? "subject" : "subjects"}
+              </span>
+            ) : null}
+          </SectionHeading>
+          {subjectsState.status === "loading" ? (
+            <div
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              aria-hidden="true"
+            >
+              {[0, 1, 2, 3].map((index) => (
+                <SubjectCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : subjectsState.status === "error" ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load your subjects"
+              description={subjectsState.message}
+              cta={{
+                label: subjectsState.unauthorized
+                  ? "Sign in again"
+                  : "Try again",
+                onClick: () => {
+                  if (subjectsState.unauthorized) {
+                    router.push("/signin");
+                    return;
+                  }
+                  void reloadSubjects();
+                },
+              }}
+            />
+          ) : subjectsState.subjects.length > 0 ? (
+            <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" stagger={0.06}>
+              {subjectsState.subjects.map((subject) => (
+                <StaggerItem key={subject.id}>
+                  <SubjectCard subject={subject} />
+                </StaggerItem>
+              ))}
+            </Stagger>
+          ) : (
+            <EmptyState
+              icon={BookOpen}
+              title="No subjects yet"
+              description="Add your first subject to start tracking progress across your studies."
+              cta={{
+                label: "Add a subject",
+                onClick: () => router.push("/dashboard/subjects"),
+              }}
+            />
+          )}
+        </section>
+      </Reveal>
 
-      <section aria-labelledby="notes-heading" className="mt-10">
-        <SectionHeading title="Recent notes" />
-        <NotesSection
-          ref={notesRef}
-          notes={displayNotes}
-          loading={notesState.status === "loading"}
-          error={
-            notesState.status === "error"
-              ? {
-                  message: notesState.message,
-                  unauthorized: notesState.unauthorized,
-                }
-              : null
-          }
-          onRetry={() => void reloadNotes()}
-          onSignIn={() => router.push("/signin")}
-          subjects={readySubjects}
-          onCreated={(note) => setNotes((previous) => [note, ...previous])}
-          onUpdated={handleNoteUpdated}
-          onDeleted={handleNoteDeleted}
-        />
-      </section>
+      <Reveal direction="up">
+        <section aria-label="Progress" className="mt-10">
+          <SectionHeading title="Progress" />
+          {progressState.status === "loading" ? (
+            <div className="grid gap-6 sm:grid-cols-2" aria-hidden="true">
+              {[0, 1].map((index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+                  <div className="mt-1.5 h-3 w-36 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                  <div className="mt-6 h-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                </div>
+              ))}
+            </div>
+          ) : progressState.status === "error" ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load your progress"
+              description={progressState.message}
+              cta={{
+                label: progressState.unauthorized
+                  ? "Sign in again"
+                  : "Try again",
+                onClick: () => {
+                  if (progressState.unauthorized) {
+                    router.push("/signin");
+                    return;
+                  }
+                  void reloadProgress();
+                },
+              }}
+            />
+          ) : (
+            <ProgressCharts stats={progressState.stats} />
+          )}
+        </section>
+      </Reveal>
+
+      <Reveal direction="up">
+        <section aria-labelledby="activity-heading" className="mt-10">
+          <SectionHeading title="Recent activity" />
+          {progressState.status === "loading" ? (
+            <ul
+              className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+              aria-hidden="true"
+            >
+              {[0, 1, 2, 3].map((index) => (
+                <li
+                  key={index}
+                  className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 last:border-b-0 dark:border-zinc-800"
+                >
+                  <div className="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+                  <div className="h-3 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                </li>
+              ))}
+            </ul>
+          ) : progressState.status === "error" ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load your activity"
+              description={progressState.message}
+              cta={{
+                label: progressState.unauthorized
+                  ? "Sign in again"
+                  : "Try again",
+                onClick: () => {
+                  if (progressState.unauthorized) {
+                    router.push("/signin");
+                    return;
+                  }
+                  void reloadProgress();
+                },
+              }}
+            />
+          ) : (
+            <ActivityFeed items={progressState.activity} />
+          )}
+        </section>
+      </Reveal>
+
+      <Reveal direction="up">
+        <section aria-labelledby="notes-heading" className="mt-10">
+          <SectionHeading title="Recent notes" />
+          <NotesSection
+            ref={notesRef}
+            notes={displayNotes}
+            loading={notesState.status === "loading"}
+            error={
+              notesState.status === "error"
+                ? {
+                    message: notesState.message,
+                    unauthorized: notesState.unauthorized,
+                  }
+                : null
+            }
+            onRetry={() => void reloadNotes()}
+            onSignIn={() => router.push("/signin")}
+            subjects={readySubjects}
+            onCreated={(note) => setNotes((previous) => [note, ...previous])}
+            onUpdated={handleNoteUpdated}
+            onDeleted={handleNoteDeleted}
+          />
+        </section>
+      </Reveal>
     </DashboardShell>
   );
 }
