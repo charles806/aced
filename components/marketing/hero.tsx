@@ -19,7 +19,7 @@ const LINE_VARIANTS = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: EASE },
+    transition: { duration: 0.5, ease: EASE },
   },
 };
 
@@ -37,7 +37,7 @@ export function Hero() {
     <section className="relative overflow-hidden pt-28 sm:pt-36">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 dotted-bg opacity-[0.35] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)] dark:opacity-[0.25]"
+        className="pointer-events-none absolute inset-0 dotted-bg opacity-[0.35] mask-[radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)] dark:opacity-[0.25]"
       />
       <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
@@ -62,7 +62,7 @@ export function Hero() {
             variants={{
               hidden: {},
               show: {
-                transition: { staggerChildren: 0.12, delayChildren: 0.1 },
+                transition: { staggerChildren: 0.09, delayChildren: 0.01 },
               },
             }}
             className="mt-6 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-zinc-900 sm:text-6xl dark:text-zinc-50"

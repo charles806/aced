@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cx } from "@/components/marketing/lib/cx";
 
@@ -80,7 +80,7 @@ export function CountUp({
   className?: string;
 }) {
   const reduced = useReducedMotion();
-  const parsed = parseCount(value);
+  const parsed = useMemo(() => parseCount(value), [value]);
   const [current, setCurrent] = useState(0);
   const frameRef = useRef<number | null>(null);
 
@@ -109,7 +109,7 @@ export function CountUp({
 
   const shown = reduced || !parsed ? value : formatCount(parsed, current);
 
-  return <span className={className}>{shown}</span>;
+  return <span className={cx(className, "tabular-nums")}>{shown}</span>;
 }
 
 export function PulseDot({ className }: { className?: string }) {

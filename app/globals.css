@@ -238,3 +238,7 @@
     animation: none;
   }
 }
+
+div,bUtton{
+  cursor: pointer;
+}
