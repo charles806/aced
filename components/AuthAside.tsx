@@ -36,7 +36,7 @@ export function AuthAside() {
               your study space
             </span>
           </div>
-          <div className="paper-grain -mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-paper-50 p-2 shadow-[0_2px_4px_rgba(24,24,27,0.04),0_16px_32px_-16px_rgba(24,24,27,0.18)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_16px_32px_-16px_rgba(0,0,0,0.7)]">
+          <div className="paper-grain relative -mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-paper-50 p-2 shadow-[0_2px_4px_rgba(24,24,27,0.04),0_16px_32px_-16px_rgba(24,24,27,0.18)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_16px_32px_-16px_rgba(0,0,0,0.7)]">
             <Image
               src="/previews/notes.svg"
               alt="ACED notes and subjects preview"

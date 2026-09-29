@@ -21,11 +21,21 @@ export function Dialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // Callers pass an inline `onClose`, so its identity changes on every render.
+  // Keeping it in a ref lets the effect below depend on `open` only — otherwise
+  // each keystroke inside the dialog re-runs the effect and yanks focus back to
+  // the panel.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -36,7 +46,7 @@ export function Dialog({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

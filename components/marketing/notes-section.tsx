@@ -68,7 +68,7 @@ export function NotesSection() {
             >
               units, notes, files ✦
             </Annotation>
-            <div className="paper-grain rounded-2xl border border-zinc-200 bg-paper-100 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="paper-grain relative rounded-2xl border border-zinc-200 bg-paper-100 p-3 dark:border-zinc-800 dark:bg-zinc-900">
               <PaperCard className="overflow-hidden">
                 <Image
                   src="/previews/notes.svg"

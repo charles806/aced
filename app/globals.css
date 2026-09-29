@@ -118,10 +118,9 @@
   }
 }
 
-@utility paper-grain {
-  position: relative;
-}
-
+/* NOTE: paper-grain/tape must not declare `position` — custom `@utility`
+   blocks are sorted alongside the core position utilities, so a
+   `position: relative` here would win over `fixed`/`absolute`/`sticky`. */
 .paper-grain::before {
   content: "";
   position: absolute;
@@ -146,10 +145,6 @@
       inset 0 -1px 2px rgba(0, 0, 0, 0.18),
       0 1px 3px rgba(0, 0, 0, 0.14);
   }
-}
-
-@utility tape {
-  position: relative;
 }
 
 .tape::before {

@@ -43,3 +43,8 @@ next-env.d.ts
 /app/generated/prisma
 .opencode
 test
+
+# Google Cloud credentials — never commit these
+client_secret_*.json
+gcp-*-sa.json
+*service-account*.json

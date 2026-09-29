@@ -40,11 +40,19 @@ export function NoteFileViewer({ note, fileUrl, onClose }: NoteFileViewerProps) 
   const [failed, setFailed] = useState(false);
   const badge = fileTypeBadge(note.fileType);
 
+  // `onClose` is an inline arrow at every call site, so it changes identity on
+  // each render. Holding it in a ref keeps the effect below from re-running.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     panelRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -54,7 +62,7 @@ export function NoteFileViewer({ note, fileUrl, onClose }: NoteFileViewerProps) 
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [fileUrl, onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50">

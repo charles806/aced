@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getSignedFileUrl, storage } from "@/app/lib/storage";
 import { Prisma } from "@/app/generated/prisma/client";
+import { inngest } from "@/inngest/client";
 
 export const runtime = "nodejs";
 
@@ -199,6 +200,12 @@ export async function POST(req: Request) {
                 fileType: uploadedFile.contentType ?? file.type,
                 userId: user.id,
                 subjectId: subject.id,
+            },
+        });
+        await inngest.send({
+            name: "note/extraction.requested",
+            data: {
+                noteId: result.id,
             },
         });
 

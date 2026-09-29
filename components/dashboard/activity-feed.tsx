@@ -32,7 +32,7 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
 
   return (
     <motion.ul
-      className="paper-grain divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
+      className="paper-grain relative divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
       initial={reduced ? false : "hidden"}
       animate="show"
       variants={{

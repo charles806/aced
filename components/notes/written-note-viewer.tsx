@@ -12,11 +12,19 @@ type WrittenNoteViewerProps = {
 export function WrittenNoteViewer({ note, onClose }: WrittenNoteViewerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // `onClose` is an inline arrow at every call site, so it changes identity on
+  // each render. Holding it in a ref keeps the effect below mount-only.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     panelRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -26,7 +34,7 @@ export function WrittenNoteViewer({ note, onClose }: WrittenNoteViewerProps) {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50">
