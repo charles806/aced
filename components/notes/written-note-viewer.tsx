@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ArrowLeft, PenLine, X } from "lucide-react";
 import type { NoteWithSubjectName } from "@/components/dashboard/use-notes";
+import { NoteSummary } from "@/components/notes/note-summary";
 
 type WrittenNoteViewerProps = {
   note: NoteWithSubjectName;
@@ -104,6 +105,10 @@ export function WrittenNoteViewer({ note, onClose }: WrittenNoteViewerProps) {
                   {note.content}
                 </p>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <NoteSummary noteId={note.id} />
             </div>
 
             <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">

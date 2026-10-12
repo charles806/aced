@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, Loader2, X } from "lucide-react";
 import type { NoteWithSubjectName } from "@/components/dashboard/use-notes";
+import { NoteSummary } from "@/components/notes/note-summary";
 
 type FileTypeLabel = { label: string; className: string };
 
@@ -164,6 +165,10 @@ export function NoteFileViewer({ note, fileUrl, onClose }: NoteFileViewerProps) 
                   </button>
                 </div>
               ) : null}
+            </div>
+
+            <div className="mt-4">
+              <NoteSummary noteId={note.id} />
             </div>
           </div>
         </div>

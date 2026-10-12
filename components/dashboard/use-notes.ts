@@ -15,6 +15,10 @@ export type Note = {
   updatedAt: string;
   userId: string;
   subjectId: string;
+  summary?: string | null;
+  summaryStatus?: string | null;
+  summaryUpdatedAt?: string | null;
+  summaryLength?: string | null;
   /** Only present when the API generated one (list/single GET). */
   signedUrl?: string | null;
 };

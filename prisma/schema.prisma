@@ -39,6 +39,13 @@ model Note {
   extractionStatus String @default("pending")
   extractionError  String?
 
+  summary          String?
+  summaryStatus    String   @default("none")
+  summaryError     String?
+  summaryUpdatedAt DateTime?
+  summaryModel     String?
+  summaryLength    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -50,6 +57,35 @@ model Note {
 
   @@index([userId])
   @@index([subjectId])
+
+  aiConversations AIConversation[]
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId    String?
+  note      Note?    @relation(fields: [noteId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AIMessage[]
+
+  @@index([userId])
+  @@index([noteId])
+}
+
+model AIMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
 }
 
 model StudySession {
@@ -150,6 +186,7 @@ model RadonUser {
   activities     Activity[]
   subscription   Subscription?
   settings       UserSettings?
+  aiConversations AIConversation[]
 
   @@index([email])
 }

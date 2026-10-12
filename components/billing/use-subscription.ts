@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest, type ApiResult } from "@/app/lib/api-client";
 
 export type SubscriptionState = {
@@ -28,6 +28,26 @@ type UseSubscriptionOptions = {
 };
 
 /**
+ * Session-wide cache: the subscription is fetched once and every later
+ * `useSubscription()` mount reads the cache instead of hitting the network.
+ * Concurrent mounts share a single in-flight request.
+ */
+let cache: { subscription: SubscriptionState | null } | null = null;
+let inflight: Promise<ApiResult<SubscriptionPayload>> | null = null;
+
+function fetchSubscription(): Promise<ApiResult<SubscriptionPayload>> {
+  if (!inflight) {
+    inflight = apiRequest<SubscriptionPayload>(
+      "/api/billing/subscription",
+    ).finally(() => {
+      inflight = null;
+    });
+  }
+
+  return inflight;
+}
+
+/**
  * Live billing state for the current user, refreshed from
  * `GET /api/billing/subscription`. `subscription` is `null` for a free user
  * with no row yet. Polling is optional (the success/cancelled pages rely on it
@@ -38,53 +58,77 @@ export function useSubscription({
   intervalMs,
 }: UseSubscriptionOptions = {}) {
   const [subscription, setSubscription] = useState<SubscriptionState | null>(
-    null
+    cache?.subscription ?? null,
   );
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(cache !== null);
 
-  const apply = useCallback(
-    (result: ApiResult<SubscriptionPayload>) => {
-      if (!result.ok) {
-        if (result.failure.kind === "unauthorized") {
-          onUnauthorized?.();
-        }
-        return;
-      }
-      setSubscription(result.data.subscription);
-      setLoaded(true);
-    },
-    [onUnauthorized],
-  );
+  // `onUnauthorized` is an inline arrow at most call sites, so it changes
+  // identity on every render. Holding it in a ref keeps the fetch effect
+  // below from re-running (which was causing a fetch-per-render loop).
+  const onUnauthorizedRef = useRef(onUnauthorized);
 
-  const refresh = useCallback(async () => {
-    const result = await apiRequest<SubscriptionPayload>(
-      "/api/billing/subscription",
-    );
-    apply(result);
-  }, [apply]);
+  useEffect(() => {
+    onUnauthorizedRef.current = onUnauthorized;
+  }, [onUnauthorized]);
 
   useEffect(() => {
     let active = true;
 
-    const load = async () => {
-      const result = await apiRequest<SubscriptionPayload>(
-        "/api/billing/subscription",
-      );
-      if (active) apply(result);
+    const apply = (result: ApiResult<SubscriptionPayload>) => {
+      if (!active) return;
+
+      if (!result.ok) {
+        if (result.failure.kind === "unauthorized") {
+          onUnauthorizedRef.current?.();
+        }
+        // A failed check is still a finished check — never spin forever.
+        setLoaded(true);
+        return;
+      }
+
+      cache = { subscription: result.data.subscription };
+      setSubscription(result.data.subscription);
+      setLoaded(true);
     };
 
-    void load();
+    // Polling always hits the network; the one-shot path uses the cache.
+    if (intervalMs) {
+      void fetchSubscription().then(apply);
+      const timer = setInterval(() => void fetchSubscription().then(apply), intervalMs);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }
 
-    if (!intervalMs) return () => {
-      active = false;
-    };
+    if (cache) {
+      setSubscription(cache.subscription);
+      setLoaded(true);
+      return;
+    }
 
-    const timer = setInterval(() => void load(), intervalMs);
+    void fetchSubscription().then(apply);
+
     return () => {
       active = false;
-      clearInterval(timer);
     };
-  }, [apply, intervalMs]);
+  }, [intervalMs]);
+
+  const refresh = useCallback(async () => {
+    const result = await fetchSubscription();
+
+    if (!result.ok) {
+      if (result.failure.kind === "unauthorized") {
+        onUnauthorizedRef.current?.();
+      }
+      setLoaded(true);
+      return;
+    }
+
+    cache = { subscription: result.data.subscription };
+    setSubscription(result.data.subscription);
+    setLoaded(true);
+  }, []);
 
   return { subscription, loaded, refresh };
 }
