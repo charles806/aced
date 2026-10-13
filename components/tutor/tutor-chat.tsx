@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   BookOpen,
@@ -10,14 +10,10 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import { DashboardShell } from "@/components/dashboard/shell";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { Reveal } from "@/components/marketing/reveal";
-import { apiRequest } from "@/app/lib/api-client";
 import {
   useNotes,
   withSubjectNames,
-  type NoteWithSubjectName,
 } from "@/components/dashboard/use-notes";
 import { useSubjects } from "@/components/dashboard/use-subjects";
 import { cx } from "@/components/marketing/lib/cx";
@@ -72,9 +68,10 @@ export function TutorChat({
   const [currentInput, setCurrentInput] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrolledUpRef = useRef(false);
+  const [scrolledUp, setScrolledUp] = useState(false);
   const isAtBottomRef = useRef(true);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const didHydrateRef = useRef(false);
 
   // Re-hydrate an existing conversation from the URL (refresh/reopen case).
@@ -153,7 +150,7 @@ export function TutorChat({
       const atBottom = distance < MAX_SCROLL_DISTANCE_PX;
 
       isAtBottomRef.current = atBottom;
-      scrolledUpRef.current = !atBottom;
+      setScrolledUp(!atBottom);
     };
 
     el.addEventListener("scroll", handleScroll, { passive: true });
@@ -167,7 +164,7 @@ export function TutorChat({
   useEffect(() => {
     const el = scrollRef.current;
 
-    if (!el || scrolledUpRef.current) return;
+    if (!el || scrolledUp) return;
 
     const scrollToBottom = () => {
       el.scrollTop = el.scrollHeight;
@@ -175,7 +172,7 @@ export function TutorChat({
 
     // rAF lets the DOM paint the new text before jumping to bottom.
     requestAnimationFrame(scrollToBottom);
-  }, [messages, phase]);
+  }, [messages, phase, scrolledUp]);
 
   const scrollToBottomNow = () => {
     const el = scrollRef.current;
@@ -183,7 +180,7 @@ export function TutorChat({
     if (!el) return;
 
     el.scrollTop = el.scrollHeight;
-    scrolledUpRef.current = false;
+    setScrolledUp(false);
     isAtBottomRef.current = true;
   };
 
@@ -233,7 +230,10 @@ export function TutorChat({
       await readTutorStream(res, (event) => {
         if (event.type === "done" || event.type === "error") {
           gotTerminal = true;
-          // setConversationId(event.conversationId);
+        }
+
+        if (event.type === "meta") {
+          setConversationId(event.conversationId);
           return;
         }
 
@@ -322,7 +322,7 @@ export function TutorChat({
         description="Choose a note from the header to start chatting with the ACED Tutor."
         cta={{
           label: "Browse notes",
-          onClick: () => (window.location.href = "/dashboard/notes"),
+          onClick: () => router.push("/dashboard/notes"),
         }}
       />
     );
@@ -421,7 +421,7 @@ export function TutorChat({
         ) : null}
       </div>
 
-      {scrolledUpRef.current && !streamingBubbleActive ? (
+      {scrolledUp && !streamingBubbleActive ? (
         <button
           type="button"
           onClick={scrollToBottomNow}
