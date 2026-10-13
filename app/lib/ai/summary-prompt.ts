@@ -28,7 +28,7 @@ Rules:
 - Base the summary only on the material below. Never add facts from outside it.
 - Reply with a TL;DR paragraph, then a "Key points" section of 5-8 bullets, then a "Key terms" section of at most 8 terms (term — one-line definition).
 - Keep the whole summary around 350 words.
-- Reply with markdown only. No preamble, no meta-commentary.
+- Reply with markdown only. No preamble, no meta-commentary..
 - If parts of the material look like OCR noise or are unreadable, flag that instead of guessing.`;
 
 export function summaryInstructionsFor(length: SummaryLength): string {
