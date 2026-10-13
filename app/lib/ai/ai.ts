@@ -1,9 +1,34 @@
 import OpenAI from "openai";
 
-export const client = new OpenAI({
-  apiKey: process.env.BREWKEG_API_KEY,
-  baseURL: process.env.BREWKEG_BASE_URL,
-});
+let cachedClient: OpenAI | null = null;
+
+/**
+ * Create the provider client on first use, not at module load.
+ *
+ * Building the client eagerly meant a missing BREWKEG_API_KEY threw during
+ * `next build` (route modules are imported to collect metadata), failing the
+ * whole deploy instead of just the requests that actually need the model.
+ */
+export function getClient(): OpenAI {
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  const apiKey = process.env.BREWKEG_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "BREWKEG_API_KEY is not set. Add it to the environment to use AI features.",
+    );
+  }
+
+  cachedClient = new OpenAI({
+    apiKey,
+    baseURL: process.env.BREWKEG_BASE_URL,
+  });
+
+  return cachedClient;
+}
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL;
 
@@ -16,7 +41,7 @@ const DEFAULT_MODEL = process.env.DEFAULT_MODEL;
  * surface them (the Tutor route turns them into a generic 502).
  */
 export async function generateText(input: string): Promise<string> {
-  const response = await client.responses.create({
+  const response = await getClient().responses.create({
     model: DEFAULT_MODEL,
     input,
   });
@@ -52,7 +77,7 @@ export async function streamText(
   input: string,
   { onDelta, signal }: StreamTextOptions,
 ): Promise<string> {
-  const stream = await client.responses.create(
+  const stream = await getClient().responses.create(
     {
       model: DEFAULT_MODEL,
       input,
@@ -69,7 +94,7 @@ export async function streamText(
         full += event.delta;
         await onDelta(event.delta);
       }
-      continue;
+        continue;
     }
 
     if ((event as any).type === "error" || (event as any).type === "response.error") {
@@ -96,3 +121,5 @@ export async function streamText(
 
   return full;
 }
+
+

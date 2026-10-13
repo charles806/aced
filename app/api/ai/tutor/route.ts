@@ -291,6 +291,7 @@ export async function POST(req: Request) {
                 title: true,
                 extractedText: true,
                 extractionStatus: true,
+                content: true,
             },
         });
     } catch (error) {
@@ -303,10 +304,21 @@ export async function POST(req: Request) {
     }
 
     // 5. The tutor needs usable study material.
-    if (
-        note.extractionStatus !== "completed" ||
-        !note.extractedText?.trim()
-    ) {
+    const material =
+        (note.extractionStatus === "completed"
+            ? note.extractedText?.trim()
+            : "") ||
+        note.content?.trim() ||
+        "";
+
+    if (!material) {
+        if (note.extractionStatus === "failed") {
+            return jsonError(
+                "We couldn't read this note. Try re-uploading it as a clearer PDF or image.",
+                422
+            );
+        }
+
         return jsonError(
             "This note isn't ready for AI yet. Wait for text extraction to finish, then try again.",
             409
@@ -343,7 +355,7 @@ export async function POST(req: Request) {
             conversationIdForTurn = existing.conversation.id;
             input = buildTutorInputWithHistory(
                 note.title,
-                note.extractedText,
+                material,
                 existing.conversation.history,
                 studentMessage
             );
@@ -364,7 +376,7 @@ export async function POST(req: Request) {
             });
 
             conversationIdForTurn = newConversation.id;
-            input = buildTutorInput(note.title, note.extractedText, studentMessage);
+            input = buildTutorInput(note.title, material, studentMessage);
         }
     } catch (error) {
         console.error("POST /api/ai/tutor persistence failed:", error);

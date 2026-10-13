@@ -1,3 +1,4 @@
+import "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {

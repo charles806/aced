@@ -1,7 +1,5 @@
 import { prisma } from "../auth";
 import { storage } from "../storage";
-import { extractPdfText } from "./pdf";
-import { extractImageText } from "./ocr";
 
 const PDF_MIME_TYPE = "application/pdf";
 const IMAGE_MIME_PREFIX = "image/";
@@ -80,11 +78,13 @@ export async function processNoteExtraction(noteId: string) {
         const arrayBuffer = await response.arrayBuffer();
         const fileBuffer = Buffer.from(arrayBuffer);
 
-        // Both extractors return a string, so everything downstream is
-        // source-agnostic.
+        // Load the extractor lazily so a problem in one (e.g. pdfjs needing a
+        // DOMMatrix polyfill) can never crash the Inngest endpoint at module
+        // load — it only fails this one run. Both extractors return a string,
+        // so everything downstream is source-agnostic.
         const extractedText = isPdf
-            ? await extractPdfText(fileBuffer)
-            : await extractImageText(fileBuffer);
+            ? await (await import("./pdf")).extractPdfText(fileBuffer)
+            : await (await import("./ocr")).extractImageText(fileBuffer);
 
         await prisma.note.update({
             where: {

@@ -23,6 +23,9 @@ const MODEL_UNAVAILABLE_MESSAGE =
 const NOT_READY_MESSAGE =
   "This note isn't ready for AI yet. Wait for text extraction to finish, then try again.";
 
+const UNREADABLE_MESSAGE =
+  "We couldn't read this note. Try re-uploading it as a clearer PDF or image.";
+
 /** A `pending` row younger than this blocks a second POST (double-click guard). */
 const PENDING_GRACE_MS = 2 * 60 * 1000;
 
@@ -166,6 +169,9 @@ export async function POST(
   const noteText = resolveSummaryText(note);
 
   if (!noteText) {
+    if (note.extractionStatus === "failed") {
+      return jsonError(UNREADABLE_MESSAGE, 422);
+    }
     return jsonError(NOT_READY_MESSAGE, 409);
   }
 
