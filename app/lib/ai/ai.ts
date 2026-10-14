@@ -97,21 +97,31 @@ export async function streamText(
         continue;
     }
 
-    if ((event as any).type === "error" || (event as any).type === "response.error") {
+    if (
+      (event as unknown as Record<string, unknown>).type === "error" ||
+      (event as unknown as Record<string, unknown>).type === "response.error"
+    ) {
       throw new Error("Model stream error");
     }
 
     if (event.type === "response.failed") {
       const reason =
-        (event as any).response?.error?.message ??
-        (event as any).error?.message ??
+        ((event as unknown as Record<string, unknown>).response as Record<string, unknown> | undefined)
+          ?.error ??
+        ((event as unknown as Record<string, unknown>).error as Record<string, unknown> | undefined)
+          ?.message ??
         "unknown";
-      throw new Error(`Model stream failed: ${reason}`);
+      const msg = typeof reason === "string" ? reason : typeof (reason as Record<string, unknown>)?.message === "string" ? ((reason as Record<string, unknown>).message as string) : "unknown";
+      throw new Error(`Model stream failed: ${msg}`);
     }
 
     if (event.type === "response.incomplete") {
-      const reason = (event as any).response?.incomplete_details?.reason ?? "unknown";
-      throw new Error(`Model stream incomplete: ${reason}`);
+      const reason =
+        ((event as unknown as Record<string, unknown>).response as Record<string, unknown> | undefined)
+          ?.incomplete_details ??
+        "unknown";
+      const r = typeof reason === "object" && reason !== null && "reason" in reason ? (reason as Record<string, unknown>).reason : "unknown";
+      throw new Error(`Model stream incomplete: ${String(r)}`);
     }
   }
 

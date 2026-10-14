@@ -5,42 +5,36 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Reveal } from "@/components/marketing/reveal";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { TutorChat, TutorNotePicker } from "@/components/tutor/tutor-chat";
 
 function TutorPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [name, setName] = useState("Student");
-  const [noteId, setNoteId] = useState<string | null>(null);
+
+  // Derive noteId directly from URL — avoids setState-in-effect and keeps
+  // this component the single writer of noteId (TutorChat writes conversationId).
+  const noteIdParam = searchParams.get("noteId");
+  const noteId = noteIdParam && noteIdParam.trim() !== "" ? noteIdParam.trim() : null;
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("sv-name") : null;
-    const frame = window.requestAnimationFrame(() => {
-      if (stored) setName(stored);
-    });
-    return () => window.cancelAnimationFrame(frame);
+    if (stored) setName(stored);
   }, []);
 
-  useEffect(() => {
-    const q = searchParams.get("noteId");
-    setNoteId(q && q.trim() !== "" ? q.trim() : null);
-  }, [searchParams]);
-
   const handleNoteChange = (next: string | null) => {
-    setNoteId(next);
-
-    if (typeof window === "undefined") return;
-
-    const url = new URL(window.location.href);
-
+    const params = new URLSearchParams(searchParams.toString());
     if (next) {
-      url.searchParams.set("noteId", next);
+      params.set("noteId", next);
     } else {
-      url.searchParams.delete("noteId");
+      params.delete("noteId");
     }
-
-    window.history.replaceState(null, "", url.toString());
+    // Keep conversationId when switching notes? No — note switch clears conversation in TutorChat,
+    // but we keep the param here until TutorChat clears it. To avoid 400, clear conversationId on note switch.
+    if (next !== noteId) {
+      params.delete("conversationId");
+    }
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   return (

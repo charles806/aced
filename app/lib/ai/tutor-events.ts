@@ -95,10 +95,13 @@ export function parseTutorEvent(line: string): TutorStreamEvent | null {
  * Chunk boundaries are arbitrary, so a chunk may hold half a line or several
  * lines; the trailing partial line is buffered until its newline arrives.
  * Stops at the first terminal event (`done` / `error`).
+ * Includes a 60s idle timeout that emits a synthetic error event so the UI
+ * never hangs on "Generating…".
  */
 export async function readTutorStream(
   response: Response,
   onEvent: (event: TutorStreamEvent) => void,
+  opts: { signal?: AbortSignal; idleTimeoutMs?: number } = {},
 ): Promise<void> {
   const body = response.body;
 
@@ -106,15 +109,67 @@ export async function readTutorStream(
     throw new Error("Tutor response had no body");
   }
 
+  const idleTimeoutMs = opts.idleTimeoutMs ?? 60_000;
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let gotTerminal = false;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleFired = false;
+
+  const clearIdle = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+
+  const resetIdle = () => {
+    clearIdle();
+    idleTimer = setTimeout(() => {
+      idleFired = true;
+      try {
+        onEvent({ type: "error", error: "The Tutor took too long to respond. Please try again." });
+      } catch {}
+      reader.cancel().catch(() => {});
+    }, idleTimeoutMs);
+  };
+
+  const handleAbort = () => {
+    clearIdle();
+    reader.cancel().catch(() => {});
+  };
+
+  if (opts.signal) {
+    if (opts.signal.aborted) {
+      handleAbort();
+    } else {
+      opts.signal.addEventListener("abort", handleAbort, { once: true });
+    }
+  }
 
   try {
+    resetIdle();
     for (;;) {
-      const { done, value } = await reader.read();
+      if (idleFired) break;
+      if (opts.signal?.aborted) break;
+
+      let readResult: ReadableStreamReadResult<Uint8Array>;
+      try {
+        readResult = await reader.read();
+      } catch (e) {
+        if ((e as Error)?.name === "AbortError" || opts.signal?.aborted) {
+          break;
+        }
+        throw e;
+      }
+
+      const { done, value } = readResult;
 
       if (done) break;
+
+      // Got data — reset idle timer
+      resetIdle();
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -130,6 +185,8 @@ export async function readTutorStream(
           onEvent(event);
 
           if (event.type === "done" || event.type === "error") {
+            gotTerminal = true;
+            clearIdle();
             await reader.cancel().catch(() => {});
             return;
           }
@@ -141,11 +198,23 @@ export async function readTutorStream(
 
     // The server always terminates events with a newline, but a truncated
     // stream can still leave one final line buffered. Never silently drop it.
-    const trailing = parseTutorEvent(buffer);
-
-    if (trailing) onEvent(trailing);
+    if (!gotTerminal && !idleFired && !opts.signal?.aborted) {
+      const trailing = parseTutorEvent(buffer);
+      if (trailing) {
+        onEvent(trailing);
+        if (trailing.type === "done" || trailing.type === "error") {
+          gotTerminal = true;
+        }
+      }
+    }
   } finally {
-    reader.releaseLock();
+    clearIdle();
+    if (opts.signal) {
+      opts.signal.removeEventListener("abort", handleAbort);
+    }
+    try {
+      reader.releaseLock();
+    } catch {}
   }
 }
 

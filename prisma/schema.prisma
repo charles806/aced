@@ -68,6 +68,7 @@ model AIConversation {
   user      RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   noteId    String?
   note      Note?    @relation(fields: [noteId], references: [id], onDelete: SetNull)
+  title     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -75,6 +76,7 @@ model AIConversation {
 
   @@index([userId])
   @@index([noteId])
+  @@index([userId, updatedAt])
 }
 
 model AIMessage {
