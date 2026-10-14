@@ -8,6 +8,7 @@ import { LogoMark } from "@/components/logo-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/useTheme";
 import { logout } from "@/app/actions/auth";
+import { clearStudyTimerStorage } from "@/app/lib/study-timer-storage";
 import { getNavItemLabel } from "./nav-config";
 
 export function Topbar({ name }: { name: string }) {
@@ -29,6 +30,7 @@ export function Topbar({ name }: { name: string }) {
 
   const handleLogout = async () => {
     setMenuOpen(false);
+    clearStudyTimerStorage();
     await logout();
     router.push("/signin");
   };

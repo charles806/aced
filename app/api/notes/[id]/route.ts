@@ -107,9 +107,10 @@ export async function PATCH(
             }
         }
 
-        const updateData: { title: string; subjectId: string; content?: string } = {
+        const updateData: { title: string; subjectId: string; content?: string; updatedAt: Date } = {
             title: title.trim(),
             subjectId: subject.id,
+            updatedAt: new Date(),
         };
 
         // Update content for written notes

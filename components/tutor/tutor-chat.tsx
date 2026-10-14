@@ -84,7 +84,7 @@ export function TutorChat({
   const [currentInput, setCurrentInput] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hydrationAbortRef = useRef<AbortController | null>(null);
-  const streamReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const skipHydrationRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrolledUp, setScrolledUp] = useState(false);
   const isAtBottomRef = useRef(true);
@@ -167,11 +167,13 @@ export function TutorChat({
   const prevNoteIdRef = useRef<string | null>(noteId);
   useEffect(() => {
     if (prevNoteIdRef.current !== noteId) {
+      // The URL may still carry the previous note's conversationId for one
+      // render; tell the hydration effect to ignore it so we never fire a
+      // cross-note GET that the server would reject with a 400.
+      skipHydrationRef.current = true;
+
       // Abort any in-flight stream or hydration
       abortControllerRef.current?.abort();
-      try {
-        streamReaderRef.current?.cancel();
-      } catch {}
       abortControllerRef.current = null;
       hydrationAbortRef.current?.abort();
       hydrationAbortRef.current = null;
@@ -215,6 +217,12 @@ export function TutorChat({
   // Re-hydrate an existing conversation from the URL
   useEffect(() => {
     const qConversationId = searchParams.get("conversationId");
+
+    if (skipHydrationRef.current) {
+      skipHydrationRef.current = false;
+      return;
+    }
+
     if (!qConversationId) {
       // No id in URL — if we had hydrated something before, clear it
       if (hydratedIdRef.current) {
@@ -230,6 +238,10 @@ export function TutorChat({
     if (hydratedIdRef.current === qConversationId) {
       return;
     }
+
+    // Opening a different conversation supersedes any in-flight turn.
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
 
     // New id — abort previous hydration
     hydrationAbortRef.current?.abort();
@@ -254,6 +266,17 @@ export function TutorChat({
         if (controller.signal.aborted) return;
 
         if (!res.ok) {
+          // 400 means the id belongs to a different note (e.g. a stale URL
+          // param from a note switch). Treat it as "no conversation" and reset
+          // silently instead of surfacing an error.
+          if (res.status === 400) {
+            const resetParams = new URLSearchParams(searchParams.toString());
+            resetParams.delete("conversationId");
+            router.replace(`?${resetParams.toString()}`, { scroll: false });
+            hydratedIdRef.current = null;
+            setPhase("idle");
+            return;
+          }
           const payload = await res.json().catch(() => null);
           setErrorMessage(tutorFailureMessage(res.status, payload));
           setPhase("error");
@@ -472,20 +495,7 @@ export function TutorChat({
     abortControllerRef.current = null;
   };
 
-  if (!noteId) {
-    return (
-      <EmptyState
-        icon={FileText}
-        title="Pick a note first"
-        description="Choose a note from the header to start chatting with the ACED Tutor."
-        cta={{
-          label: "Browse notes",
-          onClick: () => router.push("/dashboard/notes"),
-        }}
-      />
-    );
-  }
-
+  const isGeneral = noteId === null;
   const isBusy = phase === "streaming" || phase === "loading";
   const streamingBubbleActive = messages.some(
     (m) => m.role === "assistant" && m.streaming,
@@ -613,11 +623,12 @@ export function TutorChat({
                 />
               </span>
               <h2 className="mt-4 font-display text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                Ask about this note
+                {isGeneral ? "General chat" : "Ask about this note"}
               </h2>
               <p className="mt-1.5 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                The ACED Tutor uses only this note as its source. Ask for an
-                explanation, examples, or to clarify anything that’s unclear.
+                {isGeneral
+                  ? "Ask any study question. No note is attached in this mode."
+                  : "The ACED Tutor uses only this note as its source. Ask for an explanation, examples, or to clarify anything that’s unclear."}
               </p>
             </div>
           ) : null}

@@ -22,17 +22,15 @@ function TutorPageContent() {
     if (stored) setName(stored);
   }, []);
 
+  // This component is the single writer of `noteId`. TutorChat is the single
+  // writer of `conversationId` (it clears it on a note switch). Keeping each
+  // param to exactly one owner avoids replace/replace races and stray 400s.
   const handleNoteChange = (next: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next) {
       params.set("noteId", next);
     } else {
       params.delete("noteId");
-    }
-    // Keep conversationId when switching notes? No — note switch clears conversation in TutorChat,
-    // but we keep the param here until TutorChat clears it. To avoid 400, clear conversationId on note switch.
-    if (next !== noteId) {
-      params.delete("conversationId");
     }
     router.replace(`?${params.toString()}`, { scroll: false });
   };

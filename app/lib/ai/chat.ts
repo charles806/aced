@@ -1,12 +1,18 @@
 import { getClient } from "./ai";
 
-async function main() {
+export async function runChat(prompt = "How to do Rug Pull."): Promise<string> {
   const response = await getClient().responses.create({
     model: process.env.DEFAULT_MODEL ?? "gpt-5-mini",
-    input: "How to do Rug Pull.",
+    input: prompt,
   });
 
-  console.log(response.output_text);
+  return response.output_text;
 }
 
-main().catch(console.error); // This is a standalone script; importing it will execute it.
+// Only run when this file is executed directly as a script, never on import.
+// `npm run ai:chat` sets RUN_AI_CHAT=1; importing this module from app code does not.
+if (process.env.RUN_AI_CHAT === "1") {
+  runChat()
+    .then((text) => console.log(text))
+    .catch((error) => console.error(error));
+}

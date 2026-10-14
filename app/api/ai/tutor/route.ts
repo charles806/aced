@@ -32,6 +32,13 @@ Rules:
 - If the material does not contain enough information to answer, say so plainly instead of guessing.
 - Reply with the explanation only. No preamble, no restating the question.`;
 
+const GENERAL_TUTOR_INSTRUCTIONS = `You are ACED's general study tutor. You help a student with any academic question.
+
+Rules:
+- Answer clearly, at the student's level. Keep it focused and useful.
+- Be helpful and accurate. If you are uncertain, say so plainly instead of guessing.
+- Reply with the explanation only. No preamble, no restating the question.`;
+
 /**
  * Tutor instructions + the student's note + the student's question.
  * Everything the model sees for a request goes through here.
@@ -86,6 +93,35 @@ function buildTutorInputWithHistory(
     return parts.join("\n");
 }
 
+function buildGeneralTutorInput(message: string) {
+    return [
+        GENERAL_TUTOR_INSTRUCTIONS,
+        "",
+        "--- STUDENT QUESTION ---",
+        message,
+        "--- END STUDENT QUESTION ---",
+    ].join("\n");
+}
+
+function buildGeneralTutorInputWithHistory(
+    history: Array<{ role: string; content: string }>,
+    message: string,
+) {
+    const parts = [GENERAL_TUTOR_INSTRUCTIONS, ""];
+    if (history.length > 0) {
+        parts.push("--- CONVERSATION HISTORY ---");
+        for (const h of history) {
+            parts.push(`${h.role}: ${h.content}`);
+        }
+        parts.push("--- END CONVERSATION HISTORY ---");
+        parts.push("");
+    }
+    parts.push("--- STUDENT QUESTION ---");
+    parts.push(message);
+    parts.push("--- END STUDENT QUESTION ---");
+    return parts.join("\n");
+}
+
 function isAbortError(error: unknown): boolean {
     return (
         error instanceof DOMException &&
@@ -101,7 +137,7 @@ function isAbortError(error: unknown): boolean {
 async function loadExistingConversation(
     userId: string,
     conversationId: string,
-    noteId: string
+    noteId: string | null
 ): Promise<
     | { ok: true; conversation: { id: string; history: Array<{ role: string; content: string }> } }
     | { ok: false; response: Response }
@@ -124,7 +160,8 @@ async function loadExistingConversation(
         return { ok: false, response: jsonError("Conversation not found", 404) };
     }
 
-    if (conversation.noteId && conversation.noteId !== noteId) {
+    // Strict cross-note check: general (null) and note-specific conversations are not interchangeable.
+    if (conversation.noteId !== noteId) {
         return {
             ok: false,
             response: jsonError("Conversation does not belong to this note", 400),
@@ -195,7 +232,7 @@ export async function GET(req: Request) {
             return jsonError("Conversation not found", 404);
         }
 
-        if (noteId && conversation.noteId && conversation.noteId !== noteId) {
+        if (conversation.noteId !== noteId) {
             return jsonError("Conversation does not belong to this note", 400);
         }
 
@@ -263,8 +300,17 @@ export async function POST(req: Request) {
         conversationId?: unknown;
     };
 
-    if (typeof noteId !== "string" || noteId.trim() === "") {
-        return jsonError("Note ID is required", 400);
+    // noteId may be string (note-specific) or null (general chat). Keep typed-question when switching.
+    let resolvedNoteId: string | null = null;
+    if (noteId === null) {
+        resolvedNoteId = null;
+    } else if (typeof noteId === "string" && noteId.trim() !== "") {
+        resolvedNoteId = noteId.trim();
+    } else if (noteId === undefined) {
+        // Treat missing as general for forward-compat, but we require explicit null for general in UI
+        resolvedNoteId = null;
+    } else {
+        return jsonError("Note ID must be a string or null", 400);
     }
 
     if (typeof message !== "string" || message.trim() === "") {
@@ -278,52 +324,55 @@ export async function POST(req: Request) {
         );
     }
 
-    // 4. Find the note — always scoped to the authenticated user.
-    let note;
+    // 4. Find the note — always scoped to the authenticated user (if noteId provided).
+    let note: { id: string; title: string; extractedText: string | null; extractionStatus: string; content: string | null } | null = null;
+    let material: string | null = null;
 
-    try {
-        note = await prisma.note.findFirst({
-            where: {
-                id: noteId.trim(),
-                userId: user.id,
-            },
-            select: {
-                id: true,
-                title: true,
-                extractedText: true,
-                extractionStatus: true,
-                content: true,
-            },
-        });
-    } catch (error) {
-        console.error("POST /api/ai/tutor note lookup failed:", error);
-        return jsonError("Something went wrong", 500);
-    }
-
-    if (!note) {
-        return jsonError("Note not found", 404);
-    }
-
-    // 5. The tutor needs usable study material.
-    const material =
-        (note.extractionStatus === "completed"
-            ? note.extractedText?.trim()
-            : "") ||
-        note.content?.trim() ||
-        "";
-
-    if (!material) {
-        if (note.extractionStatus === "failed") {
-            return jsonError(
-                "We couldn't read this note. Try re-uploading it as a clearer PDF or image.",
-                422
-            );
+    if (resolvedNoteId !== null) {
+        try {
+            note = await prisma.note.findFirst({
+                where: {
+                    id: resolvedNoteId,
+                    userId: user.id,
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    extractedText: true,
+                    extractionStatus: true,
+                    content: true,
+                },
+            });
+        } catch (error) {
+            console.error("POST /api/ai/tutor note lookup failed:", error);
+            return jsonError("Something went wrong", 500);
         }
 
-        return jsonError(
-            "This note isn't ready for AI yet. Wait for text extraction to finish, then try again.",
-            409
-        );
+        if (!note) {
+            return jsonError("Note not found", 404);
+        }
+
+        // 5. The tutor needs usable study material.
+        material =
+            (note.extractionStatus === "completed"
+                ? note.extractedText?.trim()
+                : "") ||
+            note.content?.trim() ||
+            "";
+
+        if (!material) {
+            if (note.extractionStatus === "failed") {
+                return jsonError(
+                    "We couldn't read this note. Try re-uploading it as a clearer PDF or image.",
+                    422
+                );
+            }
+
+            return jsonError(
+                "This note isn't ready for AI yet. Wait for text extraction to finish, then try again.",
+                409
+            );
+        }
     }
 
     // 6. Resolve the conversation, save the student's message, and build the
@@ -338,7 +387,7 @@ export async function POST(req: Request) {
             const existing = await loadExistingConversation(
                 user.id,
                 conversationId.trim(),
-                note.id
+                resolvedNoteId
             );
 
             if (!existing.ok) {
@@ -354,17 +403,24 @@ export async function POST(req: Request) {
             });
 
             conversationIdForTurn = existing.conversation.id;
-            input = buildTutorInputWithHistory(
-                note.title,
-                material,
-                existing.conversation.history,
-                studentMessage
-            );
+            if (resolvedNoteId !== null && note && material) {
+                input = buildTutorInputWithHistory(
+                    note.title,
+                    material,
+                    existing.conversation.history,
+                    studentMessage
+                );
+            } else {
+                input = buildGeneralTutorInputWithHistory(
+                    existing.conversation.history,
+                    studentMessage
+                );
+            }
         } else {
             const newConversation = await prisma.aIConversation.create({
                 data: {
                     userId: user.id,
-                    noteId: note.id,
+                    noteId: resolvedNoteId,
                 },
             });
 
@@ -377,7 +433,11 @@ export async function POST(req: Request) {
             });
 
             conversationIdForTurn = newConversation.id;
-            input = buildTutorInput(note.title, material, studentMessage);
+            if (resolvedNoteId !== null && note && material) {
+                input = buildTutorInput(note.title, material, studentMessage);
+            } else {
+                input = buildGeneralTutorInput(studentMessage);
+            }
         }
     } catch (error) {
         console.error("POST /api/ai/tutor persistence failed:", error);

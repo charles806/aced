@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Pause, Play, Square } from "lucide-react";
 import { apiRequest } from "@/app/lib/api-client";
 import { formatClock, formatDuration } from "@/app/lib/format";
+import { studyTimerStorageKey } from "@/app/lib/study-timer-storage";
 import type { Subject } from "@/components/dashboard/use-subjects";
 
-const TIMER_STORAGE_KEY = "aced-study-timer";
 const NO_SUBJECT_VALUE = "__none__";
 const TICK_MS = 1000;
 
@@ -35,11 +35,11 @@ type StudyTimerProps = {
   onSessionSaved?: () => void;
 };
 
-function readStoredTimer(): StoredTimer | null {
+function readStoredTimer(storageKey: string): StoredTimer | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const raw = window.localStorage.getItem(TIMER_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
 
     if (!raw) return null;
 
@@ -76,11 +76,15 @@ export function StudyTimer({
   const [subjectValue, setSubjectValue] = useState(NO_SUBJECT_VALUE);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<StudyTimerNotice>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [identityReady, setIdentityReady] = useState(false);
 
   const accumulatedMsRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
   const sessionRef = useRef<StudyTimerSession | null>(null);
   const intervalRef = useRef<number | null>(null);
+
+  const storageKey = studyTimerStorageKey(userId);
 
   const persist = (accumulatedMs: number) => {
     const current = sessionRef.current;
@@ -88,7 +92,7 @@ export function StudyTimer({
 
     try {
       window.localStorage.setItem(
-        TIMER_STORAGE_KEY,
+        storageKey,
         JSON.stringify({
           id: current.id,
           startedAt: current.startedAt,
@@ -103,7 +107,7 @@ export function StudyTimer({
 
   const clearPersisted = () => {
     try {
-      window.localStorage.removeItem(TIMER_STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
     } catch {
       // ignore
     }
@@ -132,8 +136,39 @@ export function StudyTimer({
     }, TICK_MS);
   };
 
+  // Resolve the current user before touching persisted state so we never
+  // restore another student's timer on a shared browser.
   useEffect(() => {
-    const stored = readStoredTimer();
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (res.ok) {
+          const data = (await res.json()) as { user?: { id?: string } };
+          if (!cancelled) setUserId(data.user?.id ?? null);
+        }
+      } catch {
+        // Unauthenticated/offline — fall back to the anonymous key below.
+      } finally {
+        if (!cancelled) setIdentityReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!identityReady) return;
+
+    // Never resume a persisted session for an anonymous user.
+    if (userId === null) {
+      return () => stopTicking();
+    }
+
+    const stored = readStoredTimer(storageKey);
 
     if (stored) {
       sessionRef.current = {
@@ -150,7 +185,8 @@ export function StudyTimer({
     }
 
     return () => stopTicking();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identityReady, userId, storageKey]);
 
   const handleStart = async () => {
     if (busy || status !== "idle") return;

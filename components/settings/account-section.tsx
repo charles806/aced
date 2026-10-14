@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { KeyRound, Loader2, LogOut } from "lucide-react";
 import { apiRequest } from "@/app/lib/api-client";
 import { logout } from "@/app/actions/auth";
+import { clearStudyTimerStorage } from "@/app/lib/study-timer-storage";
 import { SettingsBanner } from "./settings-banner";
 import { useSettingsNotice } from "./use-settings-notice";
 import type { UserProfile } from "./types";
@@ -67,6 +68,7 @@ export function AccountSection({ user, onUnauthorized }: AccountSectionProps) {
   };
 
   const handleSignOut = async () => {
+    clearStudyTimerStorage();
     await logout();
     router.push("/signin");
   };

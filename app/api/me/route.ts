@@ -26,6 +26,34 @@ export function sanitizeUserForClient(user: RadonUserRow) {
     };
 }
 
+export async function GET(req: Request) {
+    const user = await getCurrentUser(req);
+
+    if (!user) {
+        return jsonError("Unauthorized", 401);
+    }
+
+    try {
+        const row = await prisma.radonUser.findUnique({
+            where: { id: user.id },
+        });
+
+        if (!row) {
+            return jsonError("User not found", 404);
+        }
+
+        return Response.json({
+            user: sanitizeUserForClient({
+                ...row,
+                metadata: (row.metadata as Record<string, unknown>) ?? {},
+            }),
+        });
+    } catch (error) {
+        console.error("GET /api/me failed:", error);
+        return jsonError("Something went wrong", 500);
+    }
+}
+
 export async function PATCH(req: Request) {
     const user = await getCurrentUser(req);
 

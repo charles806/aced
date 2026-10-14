@@ -3,7 +3,10 @@ export type ApiFailure = {
     | "network"
     | "timeout"
     | "unauthorized"
+    | "forbidden"
     | "not-found"
+    | "conflict"
+    | "unprocessable"
     | "validation"
     | "server";
   message: string;
@@ -82,6 +85,16 @@ export async function apiRequest<T>(
       };
     }
 
+    if (response.status === 403) {
+      return {
+        ok: false,
+        failure: {
+          kind: "forbidden",
+          message: serverMessage ?? "You don't have access to do that.",
+        },
+      };
+    }
+
     if (response.status === 404) {
       return {
         ok: false,
@@ -89,6 +102,28 @@ export async function apiRequest<T>(
           kind: "not-found",
           message:
             notFoundMessage ?? serverMessage ?? "This item no longer exists.",
+        },
+      };
+    }
+
+    if (response.status === 409) {
+      return {
+        ok: false,
+        failure: {
+          kind: "conflict",
+          message:
+            serverMessage ?? "That change conflicts with the current state.",
+        },
+      };
+    }
+
+    if (response.status === 422) {
+      return {
+        ok: false,
+        failure: {
+          kind: "unprocessable",
+          message:
+            serverMessage ?? "We couldn't process that. Please try again.",
         },
       };
     }
