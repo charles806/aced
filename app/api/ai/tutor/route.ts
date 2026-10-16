@@ -402,6 +402,13 @@ export async function POST(req: Request) {
                 },
             });
 
+            // Bump recency so the history list (ordered by updatedAt) reflects
+            // the new turn even though only a child AIMessage row was added.
+            await prisma.aIConversation.update({
+                where: { id: existing.conversation.id },
+                data: { updatedAt: new Date() },
+            });
+
             conversationIdForTurn = existing.conversation.id;
             if (resolvedNoteId !== null && note && material) {
                 input = buildTutorInputWithHistory(
@@ -496,6 +503,20 @@ export async function POST(req: Request) {
                             content: answer,
                         },
                     });
+
+                    // Keep history ordering correct; a failed touch must not
+                    // turn a successful turn into an error event.
+                    try {
+                        await prisma.aIConversation.update({
+                            where: { id: conversationIdForTurn },
+                            data: { updatedAt: new Date() },
+                        });
+                    } catch (touchError) {
+                        console.error(
+                            "POST /api/ai/tutor recency touch failed:",
+                            touchError
+                        );
+                    }
 
                     send({ type: "done", conversationId: conversationIdForTurn });
                 } catch (error) {

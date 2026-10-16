@@ -50,3 +50,4 @@ client_secret_*.json
 gcp-*-sa.json
 *service-account*.json
 aced-*.json
+/.axle/

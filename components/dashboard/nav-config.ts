@@ -3,6 +3,7 @@ import {
   CalendarClock,
   FileText,
   Home,
+  ScrollText,
   Settings,
   Sparkles,
   type LucideIcon,
@@ -21,6 +22,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Subjects", href: "/dashboard/subjects", icon: BookOpen },
   { label: "Notes", href: "/dashboard/notes", icon: FileText },
   { label: "AI Tutor", href: "/dashboard/ai-tutor", icon: Sparkles },
+  { label: "AI Summary", href: "/dashboard/summary", icon: ScrollText },
   { label: "Upcoming", href: "/dashboard/upcoming", icon: CalendarClock },
 ];
 

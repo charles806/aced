@@ -19,6 +19,7 @@ export type Note = {
   summaryStatus?: string | null;
   summaryUpdatedAt?: string | null;
   summaryLength?: string | null;
+  extractionStatus?: string | null;
   /** Only present when the API generated one (list/single GET). */
   signedUrl?: string | null;
 };

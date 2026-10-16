@@ -2,18 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  AlertCircle,
-  BookOpen,
-  FileText,
-  Loader2,
-  RefreshCw,
-  RotateCcw,
-  Trash2,
-  History,
-  X,
-} from "lucide-react";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { AlertCircle, BookOpen, FileText, Loader2, RefreshCw, RotateCcw, Trash2, History, X } from "lucide-react";
 import {
   useNotes,
   withSubjectNames,
@@ -72,9 +61,11 @@ function randomId(prefix: string): string {
 export function TutorChat({
   noteId,
   studentName,
+  onNoteChange,
 }: {
   noteId: string | null;
   studentName: string;
+  onNoteChange?: (id: string | null) => void;
 }) {
   const [phase, setPhase] = useState<TutorPhase>("idle");
   const [messages, setMessages] = useState<TutorMessageRecord[]>([]);
@@ -84,13 +75,25 @@ export function TutorChat({
   const [currentInput, setCurrentInput] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hydrationAbortRef = useRef<AbortController | null>(null);
-  const skipHydrationRef = useRef(false);
+  const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrolledUp, setScrolledUp] = useState(false);
   const isAtBottomRef = useRef(true);
   const searchParams = useSearchParams();
   const router = useRouter();
   const hydratedIdRef = useRef<string | null>(null);
+  const prevNoteIdRef = useRef<string | null>(noteId);
+
+  // Primitive URL values — the hydration and sync effects depend on these
+  // strings, never on the `searchParams` object identity, so a router.replace
+  // that changes nothing meaningful cannot retrigger a fetch.
+  const urlConversationId = searchParams.get("conversationId");
+
+  // Notes lookup for the near-composer attach chip (title only; the backend
+  // loads extracted text server-side and never trusts client-sent content).
+  const { state: notesState } = useNotes();
+  const notes = notesState.status === "ready" ? notesState.notes : [];
+  const attachedNoteTitle = noteId ? (notes.find((n) => n.id === noteId)?.title ?? null) : null;
 
   // Conversation history drawer
   const [showHistory, setShowHistory] = useState(false);
@@ -98,31 +101,44 @@ export function TutorChat({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const fetchHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    setHistoryError(null);
+  const fetchHistory = useCallback(async (quiet = false) => {
+    if (!quiet) setHistoryLoading(true);
+    if (!quiet) setHistoryError(null);
     try {
       const res = await fetch("/api/ai/tutor/conversations?limit=20");
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
         const msg = tutorFailureMessage(res.status, payload);
-        setHistoryError(msg);
+        if (!quiet) setHistoryError(msg);
         return;
       }
       const data = (await res.json()) as { conversations: ConversationListItem[] };
       setHistoryItems(data.conversations ?? []);
     } catch {
-      setHistoryError("Couldn't load conversations.");
+      if (!quiet) setHistoryError("Couldn't load conversations.");
     } finally {
-      setHistoryLoading(false);
+      if (!quiet) setHistoryLoading(false);
     }
   }, []);
+
+  // Load once for the desktop sidebar; the drawer also refreshes on open.
+  useEffect(() => {
+    void fetchHistory(true);
+  }, [fetchHistory]);
 
   useEffect(() => {
     if (showHistory) void fetchHistory();
   }, [showHistory, fetchHistory]);
 
   const handleOpenConversation = (id: string, cNoteId: string | null) => {
+    // Claim the note ref synchronously so the note-switch effect below sees
+    // no change and cannot clear the conversation we are about to hydrate.
+    prevNoteIdRef.current = cNoteId;
+    hydratedIdRef.current = null;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    hydrationAbortRef.current?.abort();
+    hydrationAbortRef.current = null;
     const params = new URLSearchParams(searchParams.toString());
     params.set("conversationId", id);
     if (cNoteId) params.set("noteId", cNoteId);
@@ -153,6 +169,7 @@ export function TutorChat({
     const params = new URLSearchParams(searchParams.toString());
     params.delete("conversationId");
     router.replace(`?${params.toString()}`, { scroll: false });
+    sendingRef.current = false;
     setConversationId(null);
     setMessages([]);
     setErrorMessage(null);
@@ -163,21 +180,17 @@ export function TutorChat({
     hydrationAbortRef.current?.abort();
   }, [router, searchParams]);
 
-  // Note switch: abort in-flight GET or stream, clear state, reset hydration guard
-  const prevNoteIdRef = useRef<string | null>(noteId);
+  // Note switch always starts a new conversation (the page clears
+  // `conversationId` in the same navigation). Local state is cleared here;
+  // no URL work and no hydration skip flag — the URL is already correct.
   useEffect(() => {
     if (prevNoteIdRef.current !== noteId) {
-      // The URL may still carry the previous note's conversationId for one
-      // render; tell the hydration effect to ignore it so we never fire a
-      // cross-note GET that the server would reject with a 400.
-      skipHydrationRef.current = true;
-
-      // Abort any in-flight stream or hydration
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
       hydrationAbortRef.current?.abort();
       hydrationAbortRef.current = null;
 
+      sendingRef.current = false;
       setConversationId(null);
       setMessages([]);
       setErrorMessage(null);
@@ -196,32 +209,27 @@ export function TutorChat({
     };
   }, []);
 
-  // Sync conversationId to URL via router.replace (single writer for conversationId)
+  // Mirror a confirmed conversationId to the URL. Set-only: deletions are
+  // performed explicitly by new-chat / note-change / 400-reset handlers, so a
+  // fresh mount (state null, URL with id) never deletes the id it is about
+  // to hydrate. The hydrated guard stops a stale state from reverting a
+  // just-navigated URL back to the previous conversation.
   useEffect(() => {
+    if (!conversationId) return;
+    if (hydratedIdRef.current !== conversationId) return;
     const currentInUrl = searchParams.get("conversationId");
-    if (conversationId) {
-      if (currentInUrl === conversationId) return;
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("conversationId", conversationId);
-      router.replace(`?${params.toString()}`, { scroll: false });
-    } else {
-      if (!currentInUrl) return;
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("conversationId");
-      router.replace(`?${params.toString()}`, { scroll: false });
-    }
-    // Intentionally only depend on conversationId to avoid loops
+    if (currentInUrl === conversationId) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("conversationId", conversationId);
+    router.replace(`?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
-  // Re-hydrate an existing conversation from the URL
+  // Re-hydrate an existing conversation from the URL. Keyed on the primitive
+  // param values so object identity can never retrigger a fetch. Loading
+  // history never sends an AI request — this is a GET only.
   useEffect(() => {
-    const qConversationId = searchParams.get("conversationId");
-
-    if (skipHydrationRef.current) {
-      skipHydrationRef.current = false;
-      return;
-    }
+    const qConversationId = urlConversationId;
 
     if (!qConversationId) {
       // No id in URL — if we had hydrated something before, clear it
@@ -239,11 +247,14 @@ export function TutorChat({
       return;
     }
 
+    // Claim the ref first so the URL-sync effect cannot revert the URL back
+    // to the previous conversation while this fetch is in flight.
+    hydratedIdRef.current = null;
+
     // Opening a different conversation supersedes any in-flight turn.
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
 
-    // New id — abort previous hydration
     hydrationAbortRef.current?.abort();
     const controller = new AbortController();
     hydrationAbortRef.current = controller;
@@ -252,7 +263,6 @@ export function TutorChat({
     setPhase("loading");
     setErrorMessage(null);
     setMessages([]);
-    setConversationId(null);
 
     void (async () => {
       try {
@@ -266,15 +276,18 @@ export function TutorChat({
         if (controller.signal.aborted) return;
 
         if (!res.ok) {
-          // 400 means the id belongs to a different note (e.g. a stale URL
-          // param from a note switch). Treat it as "no conversation" and reset
-          // silently instead of surfacing an error.
-          if (res.status === 400) {
+          if (res.status === 400 || res.status === 404) {
+            // Stale URL (cross-note id or deleted conversation): drop the
+            // param so a refresh does not retry the same failing GET.
             const resetParams = new URLSearchParams(searchParams.toString());
             resetParams.delete("conversationId");
             router.replace(`?${resetParams.toString()}`, { scroll: false });
             hydratedIdRef.current = null;
+            setConversationId(null);
             setPhase("idle");
+            if (res.status === 404) {
+              setErrorMessage("That conversation couldn't be found. Started a new chat.");
+            }
             return;
           }
           const payload = await res.json().catch(() => null);
@@ -319,7 +332,8 @@ export function TutorChat({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [searchParams, noteId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlConversationId, noteId]);
 
   // Track scroll
   useEffect(() => {
@@ -370,7 +384,10 @@ export function TutorChat({
 
   const handleSend = async () => {
     const text = composerValue.trim();
-    if (text.length === 0 || phase === "streaming") return;
+    // Synchronous ref guard stops rapid double-submits that slip past the
+    // async `phase` state update; the composer stays disabled via `busy`.
+    if (text.length === 0 || phase === "streaming" || sendingRef.current) return;
+    sendingRef.current = true;
 
     // Mark hydration as done BEFORE streaming so meta doesn't re-trigger hydration
     hydratedIdRef.current = conversationId ?? hydratedIdRef.current;
@@ -446,7 +463,9 @@ export function TutorChat({
             );
             setPhase("idle");
             setCurrentInput(null);
+            sendingRef.current = false;
             abortControllerRef.current = null;
+            void fetchHistory(true);
             return;
           }
 
@@ -455,6 +474,7 @@ export function TutorChat({
             setErrorMessage(event.error);
             setPhase("error");
             setCurrentInput(text);
+            sendingRef.current = false;
             abortControllerRef.current = null;
             return;
           }
@@ -466,6 +486,7 @@ export function TutorChat({
         throw new Error("The Tutor stopped responding. Please try again");
       }
     } catch (err) {
+      sendingRef.current = false;
       if (controller.signal.aborted) {
         setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
         setPhase("idle");
@@ -722,14 +743,59 @@ export function TutorChat({
           </div>
         ) : null}
 
-        <TutorComposer
-          value={composerValue}
-          onChange={setComposerValue}
-          onSubmit={() => void handleSend()}
-          busy={phase === "streaming"}
-          disabled={phase === "loading"}
-          noteTitle={noteId ? "" : "this note"}
-        />
+        <div>
+          <div className="flex items-center gap-2 border-t border-zinc-200 bg-white/90 px-3 pt-2 backdrop-blur sm:px-4 dark:border-zinc-800 dark:bg-zinc-900/90">
+            {noteId ? (
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-200 bg-accent-50 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-accent-500/10 dark:text-zinc-200">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-accent-500 dark:text-accent-400" aria-hidden="true" />
+                <span className="min-w-0 truncate">
+                  {attachedNoteTitle ?? "Attached note"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNoteChange?.(null)}
+                  disabled={isBusy}
+                  aria-label="Remove attached note"
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-zinc-100"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </span>
+            ) : (
+              <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                <span className="sr-only">Add a note for context</span>
+                <select
+                  value=""
+                  disabled={isBusy || notesState.status !== "ready"}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v) onNoteChange?.(v);
+                  }}
+                  aria-label="Add a note for context"
+                  className="max-w-44 cursor-pointer appearance-none truncate rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 outline-none transition hover:bg-zinc-50 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <option value="">Add a note…</option>
+                  {notes.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <span className="truncate text-[11px] text-zinc-400 dark:text-zinc-500">
+              {noteId ? "Answers use this note." : "General chat."}
+            </span>
+          </div>
+          <TutorComposer
+            value={composerValue}
+            onChange={setComposerValue}
+            onSubmit={() => void handleSend()}
+            busy={phase === "streaming"}
+            disabled={phase === "loading"}
+            noteTitle={attachedNoteTitle ?? ""}
+          />
+        </div>
       </section>
     </div>
   );

@@ -27,6 +27,7 @@ import { CreateNote } from "@/components/notes/create-note";
 import { EditNote } from "@/components/notes/edit-note";
 import { DeleteNote } from "@/components/notes/delete-note";
 import { NoteFileViewer } from "@/components/notes/note-file-viewer";
+import { NotePdfViewer } from "@/components/notes/note-pdf-viewer";
 import { WrittenNoteViewer } from "@/components/notes/written-note-viewer";
 
 type NoteError = { message: string; unauthorized: boolean };
@@ -91,6 +92,7 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
+    const [pdfPreview, setPdfPreview] = useState<ImagePreview | null>(null);
     const [viewingWrittenNote, setViewingWrittenNote] =
       useState<NoteWithSubjectName | null>(null);
     const [notice, setNotice] = useState<NoteNotice | null>(null);
@@ -196,15 +198,20 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
         return;
       }
 
-      if (fileType && fileType !== "application/pdf") {
-        showNotice({
-          kind: "error",
-          message: "This note's file type isn't supported for viewing.",
-        });
+      if (fileType === "application/pdf") {
+        setPdfPreview({ note, url });
         return;
       }
 
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (!fileType) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      showNotice({
+        kind: "error",
+        message: "This note's file type isn't supported for viewing.",
+      });
     };
 
     const renderList = () => {
@@ -350,6 +357,14 @@ export const NotesSection = forwardRef<NotesSectionHandle, NotesSectionProps>(
             note={imagePreview.note}
             fileUrl={imagePreview.url}
             onClose={() => setImagePreview(null)}
+          />
+        ) : null}
+
+        {pdfPreview ? (
+          <NotePdfViewer
+            note={pdfPreview.note}
+            fileUrl={pdfPreview.url}
+            onClose={() => setPdfPreview(null)}
           />
         ) : null}
 

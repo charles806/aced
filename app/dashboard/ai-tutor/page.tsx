@@ -22,9 +22,10 @@ function TutorPageContent() {
     if (stored) setName(stored);
   }, []);
 
-  // This component is the single writer of `noteId`. TutorChat is the single
-  // writer of `conversationId` (it clears it on a note switch). Keeping each
-  // param to exactly one owner avoids replace/replace races and stray 400s.
+  // This component is the single writer of `noteId`. Attaching or detaching
+  // a note always starts a new conversation, so the note switch clears any
+  // `conversationId` in the same replace — one navigation, no stale
+  // cross-note id for TutorChat to reconcile.
   const handleNoteChange = (next: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next) {
@@ -32,6 +33,7 @@ function TutorPageContent() {
     } else {
       params.delete("noteId");
     }
+    params.delete("conversationId");
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
@@ -44,7 +46,7 @@ function TutorPageContent() {
               AI Tutor
             </h1>
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              Ask about the note you’re studying. Answers stay grounded in its content.
+              Ask anything, or attach a note to study from its content.
             </p>
           </div>
           <TutorNotePicker noteId={noteId} onNoteChange={handleNoteChange} />
@@ -53,7 +55,7 @@ function TutorPageContent() {
 
       <Reveal direction="up" delay={0.05}>
         <div className="mt-6 flex min-h-[32rem] flex-col">
-          <TutorChat noteId={noteId} studentName={name} />
+          <TutorChat noteId={noteId} studentName={name} onNoteChange={handleNoteChange} />
         </div>
       </Reveal>
     </DashboardShell>

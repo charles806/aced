@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Sparkles } from "lucide-react";
-import { apiRequest } from "@/app/lib/api-client";
 import { TutorText } from "@/components/tutor/tutor-format";
 
 export type SummaryLengthOption = "short" | "detailed";
@@ -18,8 +17,22 @@ type SummaryPayload = {
 
 type LoadState =
   | { status: "loading" }
-  | { status: "error"; message: string; pro: boolean }
+  | {
+      status: "error";
+      message: string;
+      kind: "pro" | "unauthorized" | "not-ready" | "generic";
+    }
   | { status: "ready"; data: SummaryPayload };
+
+type ActionError = { message: string; unauthorized: boolean };
+
+const LOAD_TIMEOUT_MS = 15_000;
+const GENERATE_TIMEOUT_MS = 60_000;
+
+const NETWORK_MESSAGE =
+  "We couldn't connect to ACED. Please check your connection and try again.";
+const GENERIC_MESSAGE = "We couldn't load the summary. Please try again.";
+const SESSION_MESSAGE = "Your session has expired. Please sign in again.";
 
 const errorBannerClasses =
   "rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/50 dark:bg-red-950/40 dark:text-red-300";
@@ -27,8 +40,34 @@ const errorBannerClasses =
 const proBannerClasses =
   "rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/50 dark:bg-amber-950/40 dark:text-amber-300";
 
+const notReadyBannerClasses =
+  "rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/50 dark:bg-amber-950/40 dark:text-amber-300";
+
 function lengthLabel(length: string | null): string {
   return length === "short" ? "Short" : "Detailed";
+}
+
+function formatSummaryDate(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function serverMessageOf(payload: unknown): string | undefined {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    typeof (payload as Record<string, unknown>).error === "string"
+  ) {
+    return (payload as { error: string }).error;
+  }
+  return undefined;
 }
 
 export function NoteSummary({
@@ -41,45 +80,76 @@ export function NoteSummary({
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [length, setLength] = useState<SummaryLengthOption>(initialLength);
   const [working, setWorking] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<ActionError | null>(null);
+
+  // Sync guard: state updates are async, so rapid double-clicks could slip
+  // past the `working` check. The ref stops that; the backend pending guard
+  // is the second line of defence.
+  const workingRef = useRef(false);
+  // Only the latest in-flight request may write state, so a slow GET can
+  // never overwrite a newer generation result.
+  const requestRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
     setState({ status: "loading" });
     setActionError(null);
 
-    // apiRequest normalizes non-2xx into failure kinds; 403/409 surface as
-    // generic "server" with the curated backend message lost, so use fetch
-    // directly to preserve status + error text for upsell / retry states.
+    // Raw fetch (not apiRequest) so curated backend messages for 403/409
+    // survive instead of being normalized into generic text.
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
     let response: Response;
 
     try {
-      response = await fetch(`/api/notes/${noteId}/summary`);
-    } catch {
+      response = await fetch(`/api/notes/${noteId}/summary`, {
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (requestRef.current !== requestId) return;
+      const timedOut =
+        error instanceof DOMException && error.name === "AbortError";
       setState({
         status: "error",
-        message: "We couldn't load the summary. Please try again.",
-        pro: false,
+        message: timedOut ? GENERIC_MESSAGE : NETWORK_MESSAGE,
+        kind: "generic",
       });
       return;
+    } finally {
+      window.clearTimeout(timer);
     }
 
     const payload: unknown = await response.json().catch(() => null);
+    if (requestRef.current !== requestId) return;
 
     if (!response.ok) {
-      const message =
-        payload &&
-        typeof payload === "object" &&
-        "error" in payload &&
-        typeof (payload as Record<string, unknown>).error === "string"
-          ? (payload as { error: string }).error
-          : "We couldn't load the summary. Please try again.";
+      const message = serverMessageOf(payload) ?? GENERIC_MESSAGE;
 
       if (response.status === 403) {
-        setState({ status: "error", message, pro: true });
+        setState({ status: "error", message, kind: "pro" });
         return;
       }
 
-      setState({ status: "error", message, pro: false });
+      if (response.status === 401) {
+        setState({ status: "error", message: SESSION_MESSAGE, kind: "unauthorized" });
+        return;
+      }
+
+      if (response.status === 404) {
+        setState({
+          status: "error",
+          message: "That note no longer exists.",
+          kind: "generic",
+        });
+        return;
+      }
+
+      if (response.status === 409 || response.status === 422) {
+        setState({ status: "error", message, kind: "not-ready" });
+        return;
+      }
+
+      setState({ status: "error", message, kind: "generic" });
       return;
     }
 
@@ -97,33 +167,85 @@ export function NoteSummary({
   }, [load]);
 
   const generate = async (opts: { force: boolean; length: SummaryLengthOption }) => {
-    if (working) return;
+    if (workingRef.current) return;
+    workingRef.current = true;
     setWorking(true);
     setActionError(null);
+    const requestId = ++requestRef.current;
 
-    const result = await apiRequest<SummaryPayload>(`/api/notes/${noteId}/summary`, {
-      method: "POST",
-      json: { force: opts.force, length: opts.length },
-    });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
+    let response: Response;
 
+    try {
+      response = await fetch(`/api/notes/${noteId}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: opts.force, length: opts.length }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (requestRef.current === requestId) {
+        const timedOut =
+          error instanceof DOMException && error.name === "AbortError";
+        setActionError({
+          message: timedOut
+            ? "Generating is taking longer than expected. Please try again."
+            : NETWORK_MESSAGE,
+          unauthorized: false,
+        });
+      }
+      workingRef.current = false;
+      setWorking(false);
+      return;
+    } finally {
+      window.clearTimeout(timer);
+    }
+
+    const payload: unknown = await response.json().catch(() => null);
+
+    workingRef.current = false;
     setWorking(false);
+    if (requestRef.current !== requestId) return;
 
-    if (!result.ok) {
-      setActionError(result.failure.message);
+    if (!response.ok) {
+      const message = serverMessageOf(payload);
+
+      if (response.status === 403) {
+        setState({
+          status: "error",
+          message: message ?? "ACED Pro is required",
+          kind: "pro",
+        });
+        return;
+      }
+
+      if (response.status === 401) {
+        setActionError({ message: SESSION_MESSAGE, unauthorized: true });
+        return;
+      }
+
+      setActionError({
+        message: message ?? GENERIC_MESSAGE,
+        unauthorized: false,
+      });
       return;
     }
 
+    const data = payload as SummaryPayload;
+
     if (
-      result.data.summaryLength === "short" ||
-      result.data.summaryLength === "detailed"
+      data.summaryLength === "short" ||
+      data.summaryLength === "detailed"
     ) {
-      setLength(result.data.summaryLength);
+      setLength(data.summaryLength);
     }
 
-    setState({ status: "ready", data: result.data });
+    setState({ status: "ready", data });
   };
 
   const switchLength = (next: SummaryLengthOption) => {
+    if (workingRef.current) return;
     setLength(next);
 
     if (state.status !== "ready") return;
@@ -146,7 +268,7 @@ export function NoteSummary({
       className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+        <h3 className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           AI Summary
         </h3>
@@ -184,25 +306,55 @@ export function NoteSummary({
       ) : null}
 
       {state.status === "error" ? (
-        state.pro ? (
+        state.kind === "pro" ? (
           <div className={`mt-3 ${proBannerClasses}`}>
             <p>{state.message}</p>
             <Link
-              href="/pricing"
+              href="/#pricing"
               className="mt-1 inline-block font-medium underline underline-offset-2"
             >
               Upgrade to ACED Pro
             </Link>
           </div>
+        ) : state.kind === "unauthorized" ? (
+          <div className={`mt-3 ${errorBannerClasses}`} role="alert">
+            <p>{state.message}</p>
+            <Link
+              href="/signin"
+              className="mt-1 inline-block font-medium underline underline-offset-2"
+            >
+              Sign in again
+            </Link>
+          </div>
+        ) : state.kind === "not-ready" ? (
+          <div className={`mt-3 ${notReadyBannerClasses}`} role="status">
+            <p>{state.message}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={working}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Check again
+            </button>
+          </div>
         ) : (
           <div className={`mt-3 ${errorBannerClasses}`} role="alert">
-            {state.message}
+            <p>{state.message}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={working}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Try again
+            </button>
           </div>
         )
       ) : null}
 
       {state.status === "ready" ? (
-        <div className="mt-3">
+        <div className="mt-3" aria-live="polite">
           {state.data.summaryStatus === "completed" && state.data.summary ? (
             <div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -212,6 +364,11 @@ export function NoteSummary({
                 {state.data.stale ? (
                   <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
                     Outdated — note changed
+                  </span>
+                ) : null}
+                {formatSummaryDate(state.data.summaryUpdatedAt) ? (
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    Updated {formatSummaryDate(state.data.summaryUpdatedAt)}
                   </span>
                 ) : null}
               </div>
@@ -248,6 +405,15 @@ export function NoteSummary({
               </p>
               <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
               <div className="h-4 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+              {state.data.summaryStatus === "pending" && !working ? (
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Check again
+                </button>
+              ) : null}
             </div>
           ) : state.data.summaryStatus === "failed" ? (
             <div className={errorBannerClasses} role="alert">
@@ -287,7 +453,12 @@ export function NoteSummary({
 
           {actionError ? (
             <p className="mt-2 text-xs text-red-600 dark:text-red-400" role="alert">
-              {actionError}
+              {actionError.message}{" "}
+              {actionError.unauthorized ? (
+                <Link href="/signin" className="font-medium underline underline-offset-2">
+                  Sign in again
+                </Link>
+              ) : null}
             </p>
           ) : null}
         </div>

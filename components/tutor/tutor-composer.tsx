@@ -57,10 +57,12 @@ export function TutorComposer({
 
         if (canSend) onSubmit();
       }}
-      className="border-t border-zinc-200 bg-white/90 p-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 sm:p-4"
+      className="bg-white/90 p-3 backdrop-blur dark:bg-zinc-900/90 sm:p-4"
     >
       <label htmlFor="tutor-message" className="sr-only">
-        {`Ask the ACED Tutor a question about ${noteTitle}`}
+        {noteTitle
+          ? `Ask the ACED Tutor a question about ${noteTitle}`
+          : "Ask the ACED Tutor a question"}
       </label>
 
       <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm transition focus-within:border-accent-400 focus-within:ring-4 focus-within:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-within:border-accent-400 dark:focus-within:ring-accent-500/20">

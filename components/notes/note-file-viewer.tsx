@@ -7,7 +7,7 @@ import { NoteSummary } from "@/components/notes/note-summary";
 
 type FileTypeLabel = { label: string; className: string };
 
-function fileTypeBadge(type: string | null | undefined): FileTypeLabel {
+export function fileTypeBadge(type: string | null | undefined): FileTypeLabel {
   if (type === "application/pdf") {
     return {
       label: "PDF",
@@ -129,7 +129,7 @@ export function NoteFileViewer({ note, fileUrl, onClose }: NoteFileViewerProps) 
                 </div>
               ) : null}
 
-              {loaded && !failed ? (
+              {!failed ? (
                 <img
                   src={fileUrl}
                   alt={`${note.title}${note.fileName ? ` — ${note.fileName}` : ""}`}
@@ -138,7 +138,7 @@ export function NoteFileViewer({ note, fileUrl, onClose }: NoteFileViewerProps) 
                     setLoaded(true);
                     setFailed(true);
                   }}
-                  className="max-h-full w-auto max-w-full object-contain p-4"
+                  className={`max-h-full w-auto max-w-full object-contain p-4 ${loaded ? "" : "hidden"}`}
                 />
               ) : null}
 
