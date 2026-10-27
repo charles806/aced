@@ -1,6 +1,8 @@
 import {
   BookOpen,
   CalendarClock,
+  CheckCircle,
+  Edit,
   FileText,
   Home,
   ScrollText,
@@ -23,6 +25,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Notes", href: "/dashboard/notes", icon: FileText },
   { label: "AI Tutor", href: "/dashboard/ai-tutor", icon: Sparkles },
   { label: "AI Summary", href: "/dashboard/summary", icon: ScrollText },
+  { label: "Flashcards", href: "/dashboard/flashcards", icon: Edit },
+  { label: "Quizzes", href: "/dashboard/quizzes", icon: CheckCircle },
   { label: "Upcoming", href: "/dashboard/upcoming", icon: CalendarClock },
 ];
 
@@ -35,6 +39,8 @@ export const MOBILE_NAV: NavItem[] = [
   { label: "Subjects", href: "/dashboard/subjects", icon: BookOpen },
   { label: "Notes", href: "/dashboard/notes", icon: FileText },
   { label: "AI Tutor", href: "/dashboard/ai-tutor", icon: Sparkles },
+  { label: "Flashcards", href: "/dashboard/flashcards", icon: Edit },
+  { label: "Quizzes", href: "/dashboard/quizzes", icon: CheckCircle },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

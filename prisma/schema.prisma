@@ -60,6 +60,144 @@ model Note {
   @@index([subjectId])
 
   aiConversations AIConversation[]
+
+  flashcardDecks FlashcardDeck[]
+  quizzes Quiz[]
+}
+
+model FlashcardDeck {
+  id String @id @default(cuid())
+  title String
+  difficulty String?
+  sourceNoteId String?
+  sourceNote Note? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  idempotencyKey String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cards Flashcard[]
+  progress FlashcardProgress[]
+
+  @@index([userId])
+  @@index([sourceNoteId])
+  @@unique([userId, idempotencyKey])
+}
+
+model Flashcard {
+  id String @id @default(cuid())
+  deckId String
+  deck FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  front String
+  back String
+  position Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress FlashcardProgress[]
+
+  @@index([deckId])
+  @@index([deckId, position])
+}
+
+model FlashcardProgress {
+  id String @id @default(cuid())
+  userId String
+  user RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deckId String
+  deck FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  cardId String
+  card Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  status String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, cardId])
+  @@index([userId, deckId])
+  @@index([cardId])
+}
+
+model Quiz {
+  id String @id @default(cuid())
+  title String
+  sourceNoteId String?
+  sourceNote Note? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  timeLimit Int? // in minutes
+  questionCount Int
+  difficulty String
+  idempotencyKey String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  questions QuizQuestion[]
+  attempts QuizAttempt[]
+
+  @@index([userId])
+  @@index([sourceNoteId])
+  @@unique([userId, idempotencyKey])
+}
+
+model QuizQuestion {
+  id String @id @default(cuid())
+  quizId String
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  prompt String
+  options String[] // JSON array of options
+  correctIndex Int // 0-based index of correct answer
+  explanation String?
+  position Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answers QuizAnswer[]
+
+  @@index([quizId])
+  @@index([quizId, position])
+}
+
+model QuizAttempt {
+  id String @id @default(cuid())
+  quizId String
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId String
+  user RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status String // "in_progress", "submitted", "expired"
+  startedAt DateTime @default(now())
+  submittedAt DateTime?
+  deadline DateTime // server-authoritative deadline
+  score Int?
+  correctCount Int?
+  incorrectCount Int?
+  unansweredCount Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answers QuizAnswer[]
+
+  @@index([userId])
+  @@index([quizId])
+  @@index([userId, quizId])
+  @@index([status])
+}
+
+model QuizAnswer {
+  id String @id @default(cuid())
+  attemptId String
+  attempt QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedIndex Int? // null = unanswered
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
 }
 
 model AIConversation {
@@ -190,6 +328,10 @@ model RadonUser {
   subscription   Subscription?
   settings       UserSettings?
   aiConversations AIConversation[]
+  flashcardDecks FlashcardDeck[]
+  flashcardProgress FlashcardProgress[]
+  quizzes Quiz[]
+  quizAttempts QuizAttempt[]
 
   @@index([email])
 }
