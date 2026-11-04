@@ -165,6 +165,7 @@ export async function POST(req: Request) {
   try {
     raw = await generateText(
       buildQuizInput(note.title, noteText, count, difficulty),
+      { feature: "quiz" },
     );
   } catch (error) {
     console.error("POST /api/quizzes/generate model call failed:", error);

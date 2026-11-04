@@ -215,6 +215,7 @@ export async function POST(
   try {
     summary = await generateText(
       buildSummaryInput(note.title, noteText, requestedLength),
+      { feature: "summary" },
     );
   } catch (error) {
     console.error("POST /api/notes/[id]/summary model call failed:", error);

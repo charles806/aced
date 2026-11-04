@@ -146,6 +146,7 @@ export async function POST(req: Request) {
   try {
     raw = await generateText(
       buildFlashcardsInput(note.title, noteText, count, difficulty),
+      { feature: "flashcards" },
     );
   } catch (error) {
     console.error("POST /api/flashcards/generate model call failed:", error);
