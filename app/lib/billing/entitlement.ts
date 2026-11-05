@@ -99,6 +99,18 @@ export async function hasProAccess(userId: string): Promise<boolean> {
         select: { status: true, cancelAtPeriodEnd: true, currentPeriodEnd: true },
     });
 
-    if (!subscription) return false;
-    return isEntitled(subscription);
+    if (subscription && isEntitled(subscription)) {
+        return true;
+    }
+
+    const annual = await prisma.annualPurchase.findFirst({
+        where: {
+            userId,
+            status: "succeeded",
+            expiresAt: { gt: new Date() },
+        },
+        orderBy: { expiresAt: "desc" },
+    });
+
+    return !!annual;
 }

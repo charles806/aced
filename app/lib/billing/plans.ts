@@ -23,6 +23,14 @@ export type BillingPlan = {
     productId: () => string;
 };
 
+export type OneTimePlan = {
+    name: string;
+    amount: string;
+    currency: string;
+    interval: string;
+    plan: string;
+};
+
 export const PLANS = {
     pro_monthly: {
         name: "ACED Pro",
@@ -41,4 +49,20 @@ export const DEFAULT_PLAN_KEY: PlanKey = "pro_monthly";
 
 export function getDefaultPlan(): BillingPlan {
     return PLANS[DEFAULT_PLAN_KEY];
+}
+
+export const ONE_TIME_PLANS = {
+    pro_annual: {
+        name: "ACED Pro Annual",
+        amount: "19.99",
+        currency: "USD",
+        interval: "year",
+        plan: "pro_annual",
+    },
+} satisfies Record<string, OneTimePlan>;
+
+export type OneTimePlanKey = keyof typeof ONE_TIME_PLANS;
+
+export function getOneTimePlan(key: OneTimePlanKey = "pro_annual"): OneTimePlan {
+    return ONE_TIME_PLANS[key];
 }

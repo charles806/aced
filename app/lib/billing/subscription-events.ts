@@ -20,6 +20,12 @@ import { prisma } from "@/app/lib/auth";
 import type { NormalizedEvent } from "@radonsdk/payments";
 import { Prisma } from "@/app/generated/prisma/client";
 import { normalizeStatus } from "./entitlement";
+import {
+    handleAnnualPaymentSucceeded,
+    handleAnnualPaymentFailed,
+    handleAnnualRefundPaid,
+    handleAnnualDisputeCreated,
+} from "./annual-events";
 
 function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -276,10 +282,18 @@ export async function handleEvent(event: NormalizedEvent): Promise<void> {
             return cancelSubscription(data);
         case "invoice.paid":
             return extendOnInvoicePaid(data);
-        // `payment.failed` comes from collection.failed (a subscription's
-        // renewal attempt bounced) — treat it as past_due.
+        case "payment.succeeded":
+            await handleAnnualPaymentSucceeded(event);
+            return;
         case "payment.failed":
+            await handleAnnualPaymentFailed(event);
             return markPastDue(data);
+        case "refund.issued":
+            await handleAnnualRefundPaid(event);
+            return;
+        case "dispute.opened":
+            await handleAnnualDisputeCreated(event);
+            return;
         default: {
             if (PAST_DUE_PROVIDER_EVENTS.has(event.providerEventType)) {
                 return markPastDue(data);

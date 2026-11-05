@@ -3,13 +3,27 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, LogOut, Settings } from "lucide-react";
+import { Bell, Clock, LogOut, Settings } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/useTheme";
 import { logout } from "@/app/actions/auth";
 import { clearStudyTimerStorage } from "@/app/lib/study-timer-storage";
 import { getNavItemLabel } from "./nav-config";
+import { useStudyTimer } from "@/app/lib/study-timer-context";
+import { formatClock } from "@/app/lib/format";
+
+function StudyTimerIndicator() {
+  const { status, elapsedMs } = useStudyTimer();
+  if (status === "idle") return null;
+  return (
+    <div className="hidden items-center gap-1.5 rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 sm:inline-flex dark:border-accent-800 dark:bg-accent-950/40 dark:text-accent-300">
+      <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
+      <span className="tabular-nums">{formatClock(elapsedMs / 1000)}</span>
+      <span className="opacity-70">{status === "running" ? "live" : "paused"}</span>
+    </div>
+  );
+}
 
 export function Topbar({ name }: { name: string }) {
   const pathname = usePathname();
@@ -65,6 +79,8 @@ export function Topbar({ name }: { name: string }) {
           >
             <Bell className="h-4 w-4 animate-float dark:animate-none" aria-hidden="true" style={{ ["--tilt" as string]: "0deg" }} />
           </button>
+
+          <StudyTimerIndicator />
 
           <ThemeToggle dark={dark} onToggle={toggle} />
 

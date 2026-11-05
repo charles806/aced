@@ -28,10 +28,14 @@ import { requiresPro, FREE_FEATURES, PRO_FEATURES } from "../features";
 // ---------------------------------------------------------------------------
 
 const mockFindUnique = vi.fn();
+const mockFindFirst = vi.fn();
 
 vi.mock("@/app/lib/auth", () => ({
     get prisma() {
-        return { subscription: { findUnique: mockFindUnique } };
+        return { 
+            subscription: { findUnique: mockFindUnique },
+            annualPurchase: { findFirst: mockFindFirst }
+        };
     },
 }));
 
@@ -231,6 +235,7 @@ describe("isEntitled", () => {
 describe("hasProAccess", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockFindFirst.mockResolvedValue(null);
     });
 
     it("returns false for a user with no subscription", async () => {

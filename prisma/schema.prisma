@@ -287,6 +287,35 @@ model Subscription {
   @@index([status])
 }
 
+model AnnualPurchase {
+  id String @id @default(cuid())
+
+  userId String
+  user RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider String @default("bachs")
+  providerCheckoutId String? @unique
+  providerPaymentId String? @unique
+
+  plan String
+  status String
+  amountUsd String
+  amountLocal String?
+  currency String
+  reference String?
+  metadata Json?
+
+  grantedAt DateTime?
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([providerCheckoutId])
+  @@index([status])
+}
+
 model UserSettings {
   userId             String   @id
   user               RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -326,12 +355,14 @@ model RadonUser {
   studySessions  StudySession[]
   activities     Activity[]
   subscription   Subscription?
+  annualPurchases AnnualPurchase[]
   settings       UserSettings?
   aiConversations AIConversation[]
   flashcardDecks FlashcardDeck[]
   flashcardProgress FlashcardProgress[]
   quizzes Quiz[]
   quizAttempts QuizAttempt[]
+  adminAuditLogs AdminAuditLog[]
 
   @@index([email])
 }
@@ -445,4 +476,20 @@ model RadonOrgInvite {
   createdAt       DateTime
 
   @@index([orgId])
+}
+
+model AdminAuditLog {
+  id           String   @id @default(cuid())
+  adminUserId  String
+  action       String
+  targetType   String
+  targetId     String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  adminUser RadonUser @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([adminUserId, createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
 }

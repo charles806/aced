@@ -19,7 +19,7 @@ import {
 } from "@/components/dashboard/subject-card";
 import { ProgressCharts } from "@/components/dashboard/progress-charts";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { StudyTimer } from "@/components/dashboard/study-timer";
+import { StudyTimerControls } from "@/components/dashboard/study-timer-controls";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { useProgress } from "@/components/dashboard/use-progress";
 import { formatDuration } from "@/app/lib/format";
@@ -206,7 +206,7 @@ export default function DashboardPage() {
 
       <Reveal direction="up" delay={0.08}>
         <section aria-labelledby="study-timer-title" className="mt-10">
-          <StudyTimer
+          <StudyTimerControls
             subjects={readySubjects}
             onSessionSaved={() => void reloadProgress()}
             onSignIn={() => router.push("/signin")}
