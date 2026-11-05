@@ -7,8 +7,12 @@ import { BachsProvider } from "./billing/bachs-provider";
 // corrected adapter without touching node_modules. See bachs-provider.ts.
 registerProvider("bachs", async () => BachsProvider);
 
+// Determine Bachs mode from environment. Defaults to "test" for local/dev.
+// Production must set RADON_BACHS_MODE=live to use live keys.
+const bachsMode = (process.env.RADON_BACHS_MODE ?? "test") as "test" | "live";
+
 export const payments = new RadonPayments({
-    mode: "test",
+    mode: bachsMode,
     providers: {
         bachs: {
             webhookSecret: process.env.RADON_BACHS_WEBHOOK_SECRET,
