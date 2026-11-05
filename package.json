@@ -21,6 +21,7 @@
     "@radonsdk/payments": "^0.1.0",
     "@radonsdk/storage": "^0.1.1",
     "@tailwindcss/postcss": "^4",
+    "@vercel/analytics": "^2.0.1",
     "argon2": "^0.45.1",
     "framer-motion": "^13.4.3",
     "inngest": "^4.21.0",
