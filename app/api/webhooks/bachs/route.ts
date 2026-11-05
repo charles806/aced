@@ -21,40 +21,52 @@ function isWebhookSignatureError(error: unknown): boolean {
     );
 }
 
-async function alreadyProcessed(event: NormalizedEvent): Promise<boolean> {
-    const existing = await prisma.webhookEvent.findUnique({
-        where: {
-            provider_eventId: {
-                provider: event.provider,
-                eventId: event.id,
-            },
-        },
-        select: { id: true },
-    });
-
-    return existing !== null;
-}
-
-async function recordProcessed(event: NormalizedEvent) {
+async function claimEvent(event: NormalizedEvent): Promise<boolean> {
     try {
         await prisma.webhookEvent.create({
             data: {
                 provider: event.provider,
                 eventId: event.id,
                 eventType: event.providerEventType,
-                processedAt: new Date(),
+                processedAt: null,
             },
         });
+        return true; // claimed
     } catch (error) {
-        // A concurrent delivery may have recorded it first — that's fine.
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === "P2002"
         ) {
-            return;
+            // Another delivery claimed it first
+            return false;
         }
         throw error;
     }
+}
+
+async function markEventProcessed(event: NormalizedEvent) {
+    await prisma.webhookEvent.update({
+        where: {
+            provider_eventId: {
+                provider: event.provider,
+                eventId: event.id,
+            },
+        },
+        data: { processedAt: new Date() },
+    });
+}
+
+async function releaseClaim(event: NormalizedEvent) {
+    await prisma.webhookEvent.delete({
+        where: {
+            provider_eventId: {
+                provider: event.provider,
+                eventId: event.id,
+            },
+        },
+    }).catch(() => {
+        // If it was already processed by another worker, ignore
+    });
 }
 
 export async function POST(req: Request) {
@@ -94,17 +106,20 @@ export async function POST(req: Request) {
         return jsonError("Something went wrong.", 500);
     }
 
-    try {
-        if (await alreadyProcessed(event)) {
-            return new Response(null, { status: 200 });
-        }
-
-        await handleEvent(event);
-        await recordProcessed(event);
-    } catch (error) {
-        console.error("POST /api/webhooks/bachs: handling failed:", error);
-        return jsonError("Something went wrong.", 500);
+    const claimed = await claimEvent(event);
+    if (!claimed) {
+        // Already being processed or processed
+        return new Response(null, { status: 200 });
     }
 
-    return new Response(null, { status: 200 });
+    try {
+        await handleEvent(event);
+        await markEventProcessed(event);
+        return new Response(null, { status: 200 });
+    } catch (error) {
+        console.error("POST /api/webhooks/bachs: handling failed:", error);
+        // Release claim so a retry can be attempted
+        await releaseClaim(event);
+        return jsonError("Something went wrong.", 500);
+    }
 }

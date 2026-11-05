@@ -1,5 +1,6 @@
 import { prisma } from "@/app/lib/auth";
 import type { NormalizedEvent } from "@radonsdk/payments";
+import { decimalStringToMinor } from "@/app/lib/billing/decimal";
 
 function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -76,7 +77,13 @@ export async function handleAnnualPaymentSucceeded(event: NormalizedEvent): Prom
         return;
     }
 
-    const expectedMinor = Math.round(parseFloat(expectedUsd) * 100);
+    let expectedMinor: number;
+    try {
+        expectedMinor = decimalStringToMinor(expectedUsd, "USD");
+    } catch {
+        console.error(`annual-events: invalid expected amount for purchase ${pending.id}`);
+        return;
+    }
     if (eventAmountMinor !== expectedMinor) {
         console.error(`annual-events: amount mismatch for checkout ${checkoutId}: ${eventAmountMinor} != ${expectedMinor}`);
         return;
@@ -132,42 +139,73 @@ export async function handleAnnualPaymentFailed(event: NormalizedEvent): Promise
 export async function handleAnnualRefundPaid(event: NormalizedEvent): Promise<void> {
     const data = eventData(event);
     const chargeId = asString(data.charge_id);
-    if (!chargeId) return;
-
-    const purchase = await prisma.annualPurchase.findFirst({
-        where: { providerPaymentId: chargeId, status: "succeeded" },
-    });
-    if (!purchase) return;
+    const refundId = asString(data.refund_id);
+    if (!chargeId || !refundId) return;
 
     const refundedAmount = asString(data.refunded_amount);
-    const requestedAmount = asString(data.requested_amount);
-    const expectedMinor = Math.round(parseFloat(purchase.amountUsd) * 100);
-    const refundedMinor = refundedAmount ? Math.round(parseFloat(refundedAmount) * 100) : 0;
+    if (!refundedAmount) return;
 
-    if (refundedMinor >= expectedMinor) {
-        // Full refund -> revoke entitlement
-        await prisma.annualPurchase.update({
-            where: { id: purchase.id },
-            data: {
-                status: "refunded",
-                expiresAt: new Date(),
-            },
+    await prisma.$transaction(async (tx) => {
+        // Lock the purchase row for update to prevent lost updates
+        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "AnnualPurchase"
+            WHERE "providerPaymentId" = ${chargeId}
+            AND status IN ('succeeded', 'refunded')
+            FOR UPDATE
+        `;
+        if (lockedRows.length === 0) return;
+
+        const purchase = await tx.annualPurchase.findUnique({
+            where: { id: lockedRows[0].id },
         });
-        console.info(`annual-events: full refund revoked entitlement for purchase ${purchase.id}`);
-    } else {
-        // Partial refund: mark for review, do not revoke automatically
-        await prisma.annualPurchase.update({
-            where: { id: purchase.id },
-            data: {
-                metadata: {
-                    ...(purchase.metadata as any || {}),
-                    partial_refund_at: new Date().toISOString(),
-                    partial_refund_amount: refundedAmount,
+        if (!purchase) return;
+
+        const meta = (purchase.metadata as any) || {};
+        const processedRefunds = new Set<string>((meta.processed_refund_ids as string[]) || []);
+        if (processedRefunds.has(refundId)) {
+            // Duplicate refund event – already handled
+            return;
+        }
+
+        let expectedMinor: number;
+        let refundedMinor: number;
+        try {
+            expectedMinor = decimalStringToMinor(purchase.amountUsd, purchase.currency || "USD");
+            refundedMinor = decimalStringToMinor(refundedAmount, purchase.currency || "USD");
+        } catch {
+            console.error("annual-events: invalid amount format in refund event");
+            return;
+        }
+
+        const cumulative = (meta.cumulative_refunded_minor || 0) + refundedMinor;
+        const updatedMeta = {
+            ...meta,
+            cumulative_refunded_minor: cumulative,
+            processed_refund_ids: [...processedRefunds, refundId],
+        };
+
+        if (cumulative >= expectedMinor) {
+            // Full refund -> revoke entitlement
+            await tx.annualPurchase.update({
+                where: { id: purchase.id },
+                data: {
+                    status: "refunded",
+                    expiresAt: new Date(),
+                    metadata: updatedMeta,
                 },
-            },
-        });
-        console.info(`annual-events: partial refund recorded for purchase ${purchase.id}`);
-    }
+            });
+            console.info(`annual-events: full refund revoked entitlement for purchase ${purchase.id}`);
+        } else {
+            // Partial refund: mark for review, do not revoke automatically
+            updatedMeta.partial_refund_at = new Date().toISOString();
+            updatedMeta.partial_refund_amount = refundedAmount;
+            await tx.annualPurchase.update({
+                where: { id: purchase.id },
+                data: { metadata: updatedMeta },
+            });
+            console.info(`annual-events: partial refund recorded for purchase ${purchase.id}`);
+        }
+    });
 }
 
 /**
@@ -207,29 +245,75 @@ export async function handleAnnualDisputeCreated(event: NormalizedEvent): Promis
 export async function handleAnnualDisputeUpdated(event: NormalizedEvent): Promise<void> {
     const data = eventData(event);
     const disputeId = asString(data.dispute_id);
-    if (!disputeId) return;
-
-    // Find purchase by dispute_id in metadata
-    const purchases = await prisma.annualPurchase.findMany({
-        where: {
-            status: { in: ["succeeded", "disputed"] },
-        },
-    });
-    const purchase = purchases.find(p => (p.metadata as any)?.dispute_id === disputeId);
-    if (!purchase) return;
+    const chargeId = asString(data.charge_id);
+    if (!disputeId || !chargeId) return;
 
     const status = asString(data.status)?.toLowerCase();
-    if (status === "lost") {
-        await prisma.annualPurchase.update({
-            where: { id: purchase.id },
-            data: { status: "disputed_lost", expiresAt: new Date() },
+    const eventTime = event.occurredAt;
+    if (!eventTime) return;
+
+    const finalStatuses = new Set(["won", "lost", "closed", "prevented"]);
+
+    await prisma.$transaction(async (tx) => {
+        // Lock purchase row for update
+        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "AnnualPurchase"
+            WHERE "providerPaymentId" = ${chargeId}
+            AND status IN ('succeeded', 'disputed', 'disputed_lost')
+            FOR UPDATE
+        `;
+        if (lockedRows.length === 0) return;
+
+        const purchase = await tx.annualPurchase.findUnique({
+            where: { id: lockedRows[0].id },
         });
-        console.info(`annual-events: dispute lost, revoked entitlement for purchase ${purchase.id}`);
-    } else if (status === "won") {
-        await prisma.annualPurchase.update({
-            where: { id: purchase.id },
-            data: { status: "succeeded" },
-        });
-        console.info(`annual-events: dispute won, restored entitlement for purchase ${purchase.id}`);
-    }
+        if (!purchase) return;
+
+        const meta = (purchase.metadata as any) || {};
+        if (meta.dispute_id !== disputeId) return;
+
+        // Timestamp comparison inside locked transaction
+        const lastUpdateStr = meta.dispute_updated_at;
+        const lastUpdate = typeof lastUpdateStr === "string" ? new Date(lastUpdateStr) : null;
+        const lastUpdateValid = lastUpdate && !Number.isNaN(lastUpdate.getTime());
+
+        if (lastUpdateValid && eventTime <= lastUpdate) {
+            // Stale or equal event – do not overwrite newer outcome
+            return;
+        }
+
+        const updatedMeta = {
+            ...meta,
+            dispute_status: status,
+            dispute_updated_at: eventTime.toISOString(),
+        };
+
+        if (status === "lost") {
+            await tx.annualPurchase.update({
+                where: { id: purchase.id },
+                data: {
+                    status: "disputed_lost",
+                    expiresAt: new Date(),
+                    metadata: updatedMeta,
+                },
+            });
+            console.info(`annual-events: dispute lost, revoked entitlement for purchase ${purchase.id}`);
+        } else if (status === "won") {
+            await tx.annualPurchase.update({
+                where: { id: purchase.id },
+                data: {
+                    status: "succeeded",
+                    metadata: updatedMeta,
+                },
+            });
+            console.info(`annual-events: dispute won, restored entitlement for purchase ${purchase.id}`);
+        } else if (finalStatuses.has(status || "")) {
+            // Final but non-revoking status, record for audit
+            await tx.annualPurchase.update({
+                where: { id: purchase.id },
+                data: { metadata: updatedMeta },
+            });
+        }
+        // Intermediate statuses are recorded only on creation
+    });
 }

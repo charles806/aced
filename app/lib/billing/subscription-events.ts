@@ -25,6 +25,7 @@ import {
     handleAnnualPaymentFailed,
     handleAnnualRefundPaid,
     handleAnnualDisputeCreated,
+    handleAnnualDisputeUpdated,
 } from "./annual-events";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -293,6 +294,9 @@ export async function handleEvent(event: NormalizedEvent): Promise<void> {
             return;
         case "dispute.opened":
             await handleAnnualDisputeCreated(event);
+            return;
+        case "dispute.updated":
+            await handleAnnualDisputeUpdated(event);
             return;
         default: {
             if (PAST_DUE_PROVIDER_EVENTS.has(event.providerEventType)) {

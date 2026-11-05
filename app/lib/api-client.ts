@@ -16,7 +16,7 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; failure: ApiFailure };
 
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 60000;
 
 const NETWORK_MESSAGE =
   "We couldn't connect to ACED. Please check your connection and try again.";

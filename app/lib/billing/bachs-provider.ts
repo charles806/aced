@@ -54,6 +54,7 @@ import {
     type SubscriptionResult,
     type WebhookRequest,
 } from "@radonsdk/payments";
+import { decimalStringToMinor } from "@/app/lib/billing/decimal";
 
 const BACHS_SANDBOX_BASE_URL = "https://sandbox-api.bachs.io";
 const BACHS_LIVE_BASE_URL = "https://api.bachs.io";
@@ -135,7 +136,7 @@ export class BachsProvider extends BaseProvider {
                         : undefined,
                     product_cart: opts["product_cart"],
                     // Ad-hoc one-off price when no catalog product is supplied.
-                    price: opts["product_cart"] ? undefined : { amount, currency },
+                    pricing: opts["product_cart"] ? undefined : { currency, amount },
                     billing_currency: opts["billingCurrency"] ?? currency,
                     success_url: input.returnUrl,
                     cancel_url: opts["cancelUrl"],
@@ -336,6 +337,18 @@ export class BachsProvider extends BaseProvider {
         const currency = (asString(data.currency) ?? "USD").toUpperCase();
         const dataAmount = data.amount;
 
+        let amountMinor: number | undefined;
+        if (typeof dataAmount === "number") {
+            amountMinor = toMinorUnits(dataAmount, currency);
+        } else if (typeof dataAmount === "string") {
+            // Decimal-safe conversion from Bachs decimal string to minor units
+            try {
+                amountMinor = decimalStringToMinor(dataAmount, currency);
+            } catch {
+                amountMinor = undefined;
+            }
+        }
+
         return {
             type: mapBachsEvent(asString(eventRecord.type) ?? "unknown"),
             provider: this.name,
@@ -343,8 +356,8 @@ export class BachsProvider extends BaseProvider {
             objectId:
                 asString(data.id) ?? asString(data.reference) ?? asString(data.payment_id),
             amount:
-                typeof dataAmount === "number"
-                    ? { amount: toMinorUnits(dataAmount, currency), currency }
+                typeof amountMinor === "number"
+                    ? { amount: amountMinor, currency }
                     : undefined,
             providerEventType: asString(eventRecord.type) ?? "unknown",
             occurredAt: asDate(eventRecord.created_at) ?? this.now(),
@@ -452,6 +465,8 @@ function mapBachsEvent(type: string): NormalizedEvent["type"] {
             return "refund.issued";
         case "dispute.created":
             return "dispute.opened";
+        case "dispute.updated":
+            return "dispute.updated";
         case "invoice.paid":
             return "invoice.paid";
         default:

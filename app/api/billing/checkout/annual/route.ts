@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { payments } from "@/app/lib/payments";
 import { getOneTimePlan } from "@/app/lib/billing/plans";
 import { PRO_SUBSCRIPTION_STATUSES } from "@/app/lib/billing/entitlement";
+import { decimalStringToMinor, validateDecimalAmount } from "@/app/lib/billing/decimal";
 
 function customerName(user: { email: string | null; metadata: unknown }): string | undefined {
     const metadata =
@@ -45,15 +46,23 @@ export async function POST(req: Request) {
         return jsonError("Server is missing its public URL", 502);
     }
 
+    // Validate plan amount using exact decimal arithmetic
+    try {
+        validateDecimalAmount(plan.amount, plan.currency);
+    } catch (e) {
+        return jsonError(`Invalid plan configuration: ${(e as Error).message}`, 500);
+    }
+
     // Create pending AnnualPurchase record for idempotency tracking
     const reference = `aced_annual_${user.id}_${Date.now()}`;
 
     // Create checkout via Bachs charge with pricing raw amount
     // Use NGN_BANK_TRANSFER restriction if desired, but keep generic for now
     try {
+        const amountMinor = decimalStringToMinor(plan.amount, plan.currency);
         const result = await payments.charge(
             {
-                amount: { amount: parseFloat(plan.amount) * 100, currency: plan.currency },
+                amount: { amount: amountMinor, currency: plan.currency },
                 customer: { email: user.email, name: customerName(user) },
                 reference,
                 returnUrl: `${baseUrl}/billing/success`,
