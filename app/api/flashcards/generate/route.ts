@@ -16,7 +16,7 @@ import {
 import { createActivity } from "@/app/lib/activity";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const MODEL_UNAVAILABLE_MESSAGE =
   "Flashcards unavailable right now. Please try again.";

@@ -11,7 +11,7 @@ import {
 } from "@/app/lib/ai/tutor-events";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Keeps a single student question from becoming an unbounded prompt. */
 const MAX_MESSAGE_LENGTH = 2000;

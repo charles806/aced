@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/ai/summary-prompt";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 /**
  * The only message the browser ever sees when generation fails. The provider
