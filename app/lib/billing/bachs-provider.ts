@@ -464,9 +464,8 @@ function mapBachsEvent(type: string): NormalizedEvent["type"] {
         case "refund.paid":
             return "refund.issued";
         case "dispute.created":
-            return "dispute.opened";
         case "dispute.updated":
-            return "dispute.updated";
+            return "dispute.opened";
         case "invoice.paid":
             return "invoice.paid";
         default:

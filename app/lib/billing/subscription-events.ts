@@ -293,10 +293,11 @@ export async function handleEvent(event: NormalizedEvent): Promise<void> {
             await handleAnnualRefundPaid(event);
             return;
         case "dispute.opened":
+            if (event.providerEventType === "dispute.updated") {
+                await handleAnnualDisputeUpdated(event);
+                return;
+            }
             await handleAnnualDisputeCreated(event);
-            return;
-        case "dispute.updated":
-            await handleAnnualDisputeUpdated(event);
             return;
         default: {
             if (PAST_DUE_PROVIDER_EVENTS.has(event.providerEventType)) {
