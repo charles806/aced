@@ -8,7 +8,7 @@ import { inngest } from "@/inngest/client";
 
 export const runtime = "nodejs";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 export async function GET(req: Request) {
     try {
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
         // File note: file required
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            return jsonError("File must be 10MB or smaller", 400);
+            return jsonError("File must be 20MB or smaller", 400);
         }
 
         // Validate file type
