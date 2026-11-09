@@ -1,0 +1,22 @@
+{
+  "functions": {
+    "app/api/notes/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/notes/presign/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/quizzes/generate/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/flashcards/generate/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/ai/tutor/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/notes/[id]/summary/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}

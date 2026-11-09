@@ -21,7 +21,7 @@ import {
 
 export type { Note, NoteWithSubjectName };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 const inputClasses =
   "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-400 focus:ring-4 focus:ring-accent-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-accent-400 dark:focus:ring-accent-500/20";
@@ -157,79 +157,165 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
     setSubmitting(true);
     setServerError(null);
 
-    const formData = new FormData();
-    formData.append("title", title.trim());
-    formData.append("subjectId", subjectId);
-
     if (mode === "write") {
+      // Direct API call for written notes
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("subjectId", subjectId);
       formData.append("content", content.trim());
-    } else if (mode === "upload" && file) {
-      formData.append("file", file);
-    }
-
-    let response: Response;
-
-    try {
-      response = await fetch("/api/notes", {
-        method: "POST",
-        body: formData,
-      });
-    } catch {
-      setServerError(
-        mode === "upload"
-          ? "We couldn't upload your note. Please check your connection and try again."
-          : "We couldn't save your note. Please check your connection and try again."
-      );
-      setSubmitting(false);
-      return;
-    }
-
-    if (!response.ok) {
-      let message = "Something went wrong. Please try again.";
 
       try {
-        const payload = await response.json();
-        if (payload && typeof payload === "object" && "error" in payload) {
-          const err = (payload as { error: unknown }).error;
-          if (typeof err === "string" && err.length > 0) message = err;
-        }
-      } catch {
-        // Response wasn't JSON — keep the default message.
-      }
+        const response = await fetch("/api/notes", {
+          method: "POST",
+          body: formData,
+        });
 
-      setServerError(message);
-      setSubmitting(false);
+        if (!response.ok) {
+          let message = "Something went wrong. Please try again.";
+          try {
+            const payload = await response.json();
+            if (payload && typeof payload === "object" && "error" in payload) {
+              const err = (payload as { error: unknown }).error;
+              if (typeof err === "string" && err.length > 0) message = err;
+            }
+          } catch {
+            // Response wasn't JSON
+          }
+          setServerError(message);
+          setSubmitting(false);
+          return;
+        }
+
+        const payload = await response.json();
+        if (
+          !payload ||
+          typeof payload !== "object" ||
+          !("note" in payload) ||
+          typeof (payload as Record<string, unknown>).note !== "object"
+        ) {
+          void reloadSubjects();
+          setSubmitting(false);
+          return;
+        }
+
+        const note = (payload as { note: Note }).note;
+        const subject = subjects.find((s) => s.id === subjectId);
+        const subjectName = subject?.name ?? "Subject";
+
+        onCreated({ ...note, subjectName });
+        setSubmitting(false);
+        handleClose();
+      } catch {
+        setServerError("We couldn't save your note. Please check your connection and try again.");
+        setSubmitting(false);
+      }
       return;
     }
 
-    let payload: unknown;
+    // Mode === "upload" - use presigned URL for direct S3 upload
+    if (!file) {
+      setServerError("No file selected.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
-      payload = await response.json();
+      // Step 1: Get presigned URL
+      const presignResponse = await fetch("/api/notes/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          subjectId,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        }),
+      });
+
+      if (!presignResponse.ok) {
+        let message = "Failed to prepare upload. Please try again.";
+        try {
+          const payload = await presignResponse.json();
+          if (payload && typeof payload === "object" && "error" in payload) {
+            const err = (payload as { error: unknown }).error;
+            if (typeof err === "string" && err.length > 0) message = err;
+          }
+        } catch {
+          // Response wasn't JSON
+        }
+        setServerError(message);
+        setSubmitting(false);
+        return;
+      }
+
+      const { presignedUrl, key } = await presignResponse.json();
+
+      // Step 2: Upload file directly to S3
+      const uploadResponse = await fetch(presignedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        setServerError("File upload failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Step 3: Complete the note creation
+      const completeResponse = await fetch("/api/notes/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          subjectId,
+          fileName: file.name,
+          fileType: file.type,
+          key,
+        }),
+      });
+
+      if (!completeResponse.ok) {
+        let message = "Failed to create note. Please try again.";
+        try {
+          const payload = await completeResponse.json();
+          if (payload && typeof payload === "object" && "error" in payload) {
+            const err = (payload as { error: unknown }).error;
+            if (typeof err === "string" && err.length > 0) message = err;
+          }
+        } catch {
+          // Response wasn't JSON
+        }
+        setServerError(message);
+        setSubmitting(false);
+        return;
+      }
+
+      const payload = await completeResponse.json();
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !("note" in payload) ||
+        typeof (payload as Record<string, unknown>).note !== "object"
+      ) {
+        void reloadSubjects();
+        setSubmitting(false);
+        return;
+      }
+
+      const note = (payload as { note: Note }).note;
+      const subject = subjects.find((s) => s.id === subjectId);
+      const subjectName = subject?.name ?? "Subject";
+
+      onCreated({ ...note, subjectName });
+      setSubmitting(false);
+      handleClose();
     } catch {
-      setServerError("Something went wrong. Please try again.");
+      setServerError("We couldn't upload your note. Please check your connection and try again.");
       setSubmitting(false);
-      return;
     }
-
-    if (
-      !payload ||
-      typeof payload !== "object" ||
-      !("note" in payload) ||
-      typeof (payload as Record<string, unknown>).note !== "object"
-    ) {
-      void reloadSubjects();
-      setSubmitting(false);
-      return;
-    }
-
-    const note = (payload as { note: Note }).note;
-    const subject = subjects.find((s) => s.id === subjectId);
-    const subjectName = subject?.name ?? "Subject";
-
-    onCreated({ ...note, subjectName });
-    setSubmitting(false);
-    handleClose();
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,7 +340,7 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
     if (selected.size > MAX_FILE_SIZE) {
       setErrors((prev) => ({
         ...prev,
-        file: "File must be 10MB or smaller.",
+        file: "File must be 20MB or smaller.",
       }));
       setTouched((prev) => ({ ...prev, file: true }));
       setFile(null);
@@ -727,7 +813,7 @@ export function CreateNote({ open, onClose, onCreated }: CreateNoteProps) {
                 Upload PDF or image
               </span>
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                PDF or image, up to 10 MB
+                PDF or image, up to 20 MB
               </span>
             </button>
           )}
