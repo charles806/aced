@@ -11,18 +11,22 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 const FREE_FEATURES = [
   "Subjects & notes",
-  "PDF and image uploads",
+  "PDF and image uploads (3 notes max)",
   "Search and filtering",
   "Basic study tracking",
   "Dashboard & statistics",
+  "AI Tutor (20 messages)",
+  "AI flashcards (1 deck)",
+  "AI quizzes (1 quiz)",
 ];
 
 const PRO_FEATURES = [
   "Everything in Free",
-  "AI Tutor",
+  "Unlimited AI Tutor messages",
   "AI summaries",
-  "AI flashcards",
-  "AI quizzes",
+  "Unlimited AI flashcards",
+  "Unlimited AI quizzes",
+  "Unlimited note uploads",
   "Advanced study insights",
   "Future premium features",
 ];

@@ -3,6 +3,7 @@ import { jsonError, safeJsonBody } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { requireProAccess } from "@/app/lib/billing/guard";
+import { canUseFreeFeature, incrementUsage } from "@/app/lib/billing/limits";
 import { streamText } from "@/app/lib/ai/ai";
 import {
     encodeTutorEvent,
@@ -278,11 +279,19 @@ export async function POST(req: Request) {
         return jsonError("Unauthorized", 401);
     }
 
-    // 2. Pro access. Server-side only — the frontend never decides this.
+    // 2. Check access: Pro users have unlimited access, free users have limited access.
     const proAccess = await requireProAccess(user.id);
+    const isPro = proAccess.ok;
 
-    if (!proAccess.ok) {
-        return proAccess.response;
+    if (!isPro) {
+        // Check free tier limit for AI chat messages
+        const chatLimit = await canUseFreeFeature(user.id, "aiChatMessages");
+        if (!chatLimit.allowed) {
+            return jsonError(
+                `Free tier limit reached: you can send up to ${chatLimit.limit} AI chat messages. Upgrade to Pro for unlimited messages.`,
+                403
+            );
+        }
     }
 
     // 3. Validate. Only noteId and message are read; userId / isPro /
@@ -506,6 +515,10 @@ export async function POST(req: Request) {
                             content: answer,
                         },
                     });
+
+                    if (!isPro) {
+                        await incrementUsage(user.id, "aiChatMessages");
+                    }
 
                     // Keep history ordering correct; a failed touch must not
                     // turn a successful turn into an error event.

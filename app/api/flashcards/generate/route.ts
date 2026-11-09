@@ -3,6 +3,7 @@ import { jsonError, safeJsonBody } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { requireProAccess } from "@/app/lib/billing/guard";
+import { canUseFreeFeature, incrementUsage } from "@/app/lib/billing/limits";
 import { generateText } from "@/app/lib/ai/ai";
 import {
   buildFlashcardsInput,
@@ -57,9 +58,20 @@ export async function POST(req: Request) {
   const user = await getCurrentUser(req);
   if (!user) return jsonError("Unauthorized", 401);
 
-  // 2. Pro access. Server-side only — the frontend never decides this.
+  // 2. Check access: Pro users have unlimited access, free users have limited access.
   const proAccess = await requireProAccess(user.id);
-  if (!proAccess.ok) return proAccess.response;
+  const isPro = proAccess.ok;
+
+  if (!isPro) {
+    // Check free tier limit for flashcard generation
+    const flashcardLimit = await canUseFreeFeature(user.id, "flashcardDecks");
+    if (!flashcardLimit.allowed) {
+      return jsonError(
+        `Free tier limit reached: you can generate up to ${flashcardLimit.limit} flashcard deck. Upgrade to Pro for unlimited generations.`,
+        403
+      );
+    }
+  }
 
   // 3. Validate body.
   const jsonBody = await safeJsonBody(req);
@@ -183,6 +195,10 @@ export async function POST(req: Request) {
 
       return { deck, cardCount: cards.length };
     });
+
+    if (!isPro) {
+      await incrementUsage(user.id, "flashcardDecks");
+    }
 
     void createActivity({
       userId: user.id,

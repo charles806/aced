@@ -326,6 +326,22 @@ model UserSettings {
   updatedAt          DateTime @updatedAt
 }
 
+model FreeUserUsage {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      RadonUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  aiChatMessages  Int @default(0)
+  flashcardDecks  Int @default(0)
+  quizzes         Int @default(0)
+  notesUploaded   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
 model WebhookEvent {
   id        String   @id @default(cuid())
   provider  String
@@ -350,19 +366,20 @@ model RadonUser {
   createdAt     DateTime
   updatedAt     DateTime
 
-  subjects       Subject[]
-  notes          Note[]
-  studySessions  StudySession[]
-  activities     Activity[]
-  subscription   Subscription?
-  annualPurchases AnnualPurchase[]
-  settings       UserSettings?
-  aiConversations AIConversation[]
-  flashcardDecks FlashcardDeck[]
+  subjects          Subject[]
+  notes             Note[]
+  studySessions     StudySession[]
+  activities        Activity[]
+  subscription      Subscription?
+  annualPurchases   AnnualPurchase[]
+  settings          UserSettings?
+  aiConversations   AIConversation[]
+  flashcardDecks    FlashcardDeck[]
   flashcardProgress FlashcardProgress[]
-  quizzes Quiz[]
-  quizAttempts QuizAttempt[]
-  adminAuditLogs AdminAuditLog[]
+  quizzes           Quiz[]
+  quizAttempts      QuizAttempt[]
+  adminAuditLogs    AdminAuditLog[]
+  freeUsage         FreeUserUsage?
 
   @@index([email])
 }

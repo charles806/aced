@@ -51,3 +51,5 @@ gcp-*-sa.json
 *service-account*.json
 aced-*.json
 /.axle/
+.agents
+.claude

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getSignedFileUrl, storage } from "@/app/lib/storage";
 import { Prisma } from "@/app/generated/prisma/client";
 import { inngest } from "@/inngest/client";
+import { canUseFreeFeature, incrementUsage } from "@/app/lib/billing/limits";
 
 export const runtime = "nodejs";
 
@@ -96,6 +97,15 @@ export async function POST(req: Request) {
             return jsonError("Unauthorized", 401);
         }
 
+        // Check free tier limit for notes upload
+        const notesLimit = await canUseFreeFeature(user.id, "notesUploaded");
+        if (!notesLimit.allowed) {
+            return jsonError(
+                `Free tier limit reached: you can upload up to ${notesLimit.limit} notes. Upgrade to Pro for unlimited uploads.`,
+                403
+            );
+        }
+
         const formData = await req.formData();
 
         const title = formData.get("title");
@@ -144,6 +154,8 @@ export async function POST(req: Request) {
                     subjectId: subject.id,
                 },
             });
+
+            await incrementUsage(user.id, "notesUploaded");
 
             void createActivity({
                 userId: user.id,
@@ -208,6 +220,8 @@ export async function POST(req: Request) {
                 noteId: result.id,
             },
         });
+
+        await incrementUsage(user.id, "notesUploaded");
 
         void createActivity({
             userId: user.id,
