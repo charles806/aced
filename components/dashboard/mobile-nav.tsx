@@ -17,7 +17,7 @@ export function MobileNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
     >
       <ul
-        className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)]"
+        className="mx-auto flex w-full items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)]"
         role="list"
       >
         {MOBILE_NAV.map((item) => {
