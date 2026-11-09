@@ -11,7 +11,7 @@ type RadonUserRow = {
     updatedAt: Date;
 };
 
-export function sanitizeUserForClient(user: RadonUserRow) {
+function sanitizeUserForClient(user: RadonUserRow) {
     const metadata = { ...(user.metadata ?? {}) };
 
     delete metadata.__radon;
