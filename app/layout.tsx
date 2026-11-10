@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
+import { DataCacheProviderWrapper } from "@/components/providers/data-cache-provider";
 import "./globals.css";
 
 
@@ -55,7 +56,10 @@ export default function RootLayout({
           {`(function(){try{var t=localStorage.getItem("sv-theme");if(t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`}
         </Script>
       </head>
-      <body className="min-h-full flex flex-col">{children}<Analytics /></body>
+      <body className="min-h-full flex flex-col">
+        <DataCacheProviderWrapper>{children}</DataCacheProviderWrapper>
+        <Analytics />
+      </body>
     </html>
   );
 }
