@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest, type ApiResult } from "@/app/lib/api-client";
 import type { Subject } from "@/components/dashboard/use-subjects";
+import { useDataCache, buildCacheKey } from "@/app/lib/data-cache";
 
 export type Note = {
   id: string;
@@ -60,6 +61,19 @@ type NotesStateInternal =
 const LOAD_NOT_FOUND_FALLBACK = "Your notes could not be found.";
 
 const SEARCH_DEBOUNCE_MS = 300;
+const NOTES_TTL_MS = 30_000; // 30 seconds
+
+type CacheResult<T> = { data: T | undefined; status: "loading" | "ready" | "error"; error?: string; unauthorized?: boolean };
+
+function toApiResult<T>(res: CacheResult<T>): ApiResult<T> {
+  if (res.status === "ready" && res.data) {
+    return { ok: true, data: res.data };
+  }
+  if (res.status === "error") {
+    return { ok: false, failure: { kind: res.unauthorized ? "unauthorized" : "server", message: res.error ?? "Failed to load" } };
+  }
+  return { ok: false, failure: { kind: "server", message: "Loading" } };
+}
 
 function buildNotesQuery(filters: NoteFilters): string {
   const params = new URLSearchParams();
@@ -74,6 +88,7 @@ function buildNotesQuery(filters: NoteFilters): string {
 }
 
 export function useNotes(filters: NoteFilters = {}) {
+  const { get, invalidate, getEntry } = useDataCache();
   const [internalState, setState] = useState<NotesStateInternal>({
     status: "loading",
   });
@@ -95,9 +110,12 @@ export function useNotes(filters: NoteFilters = {}) {
     });
   }, [debouncedSearch, filters.subjectId, filters.fileType]);
 
+  const cacheKey = useMemo(() => {
+    return buildCacheKey("/api/notes", queryString ? { q: queryString } : undefined);
+  }, [queryString]);
+
   const fetchNotes = useCallback(async (): Promise<ApiResult<NotesPayload>> => {
-    const url =
-      queryString === "" ? "/api/notes" : `/api/notes?${queryString}`;
+    const url = queryString === "" ? "/api/notes" : `/api/notes?${queryString}`;
 
     return apiRequest<NotesPayload>(url, {
       notFoundMessage: LOAD_NOT_FOUND_FALLBACK,
@@ -125,19 +143,36 @@ export function useNotes(filters: NoteFilters = {}) {
   useEffect(() => {
     let ignore = false;
 
-    void fetchNotes().then((result) => {
-      if (!ignore) applyResult(result);
+    const cached = getEntry<NotesPayload>(cacheKey);
+    if (cached && cached.status === "ready") {
+      const isStale = Date.now() - cached.lastFetched > NOTES_TTL_MS;
+      if (!isStale) {
+        applyResult({ ok: true, data: cached.data });
+        // Revalidate in background
+        void get(cacheKey, fetchNotes, { ttlMs: NOTES_TTL_MS, dedupe: true }).then((res) => {
+          if (!ignore && res.status === "ready" && res.data) {
+            applyResult({ ok: true, data: res.data });
+          }
+        });
+        return;
+      }
+    }
+
+    void get(cacheKey, fetchNotes, { ttlMs: NOTES_TTL_MS, dedupe: true }).then((res) => {
+      if (!ignore) {
+        applyResult(toApiResult(res));
+      }
     });
 
     return () => {
       ignore = true;
     };
-  }, [fetchNotes, applyResult]);
+  }, [get, getEntry, cacheKey, fetchNotes, applyResult, queryString]);
 
   const reload = useCallback(() => {
     setState({ status: "loading" });
-    void fetchNotes().then(applyResult);
-  }, [fetchNotes, applyResult]);
+    void get(cacheKey, fetchNotes, { ttlMs: 0, dedupe: false }).then((res) => applyResult(toApiResult(res)));
+  }, [get, cacheKey, fetchNotes, applyResult]);
 
   const setNotes = useCallback(
     (update: (previous: Note[]) => Note[]) => {
@@ -146,8 +181,10 @@ export function useNotes(filters: NoteFilters = {}) {
           ? { ...current, notes: update(current.notes) }
           : current
       );
+      // Invalidate all notes cache entries since they may have different filters
+      invalidate("/api/notes");
     },
-    [queryString]
+    [invalidate, queryString]
   );
 
   const state = useMemo<NotesState>(() => {

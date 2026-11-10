@@ -16,6 +16,8 @@ import {
   readTutorStream,
   tutorFailureMessage,
 } from "@/app/lib/ai/tutor-events";
+import { useDataCache, buildCacheKey } from "@/app/lib/data-cache";
+import { type ApiResult } from "@/app/lib/api-client";
 
 type TutorMessageRecord = {
   id: string;
@@ -101,9 +103,41 @@ export function TutorChat({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
+  const { get, getEntry, invalidate } = useDataCache();
+  const historyCacheKey = buildCacheKey("/api/ai/tutor/conversations", { limit: "20" });
+  const HISTORY_TTL_MS = 60_000; // 60 seconds
+
+  type HistoryPayload = { conversations: ConversationListItem[] };
+
+  // Fetcher for cache - returns ApiResult
+  const fetchHistoryForCache = useCallback(async (): Promise<ApiResult<HistoryPayload>> => {
+    const res = await fetch("/api/ai/tutor/conversations?limit=20");
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      const msg = tutorFailureMessage(res.status, payload);
+      return { ok: false, failure: { kind: "server", message: msg } };
+    }
+    const data = (await res.json()) as HistoryPayload;
+    return { ok: true, data };
+  }, []);
+
+  // UI fetch function - updates state directly
   const fetchHistory = useCallback(async (quiet = false) => {
     if (!quiet) setHistoryLoading(true);
     if (!quiet) setHistoryError(null);
+
+    // Check cache first
+    const cached = getEntry<HistoryPayload>(historyCacheKey);
+    const now = Date.now();
+    if (cached && cached.status === "ready" && now - cached.lastFetched <= HISTORY_TTL_MS) {
+      setHistoryItems(cached.data.conversations ?? []);
+      if (!quiet) setHistoryLoading(false);
+      // Revalidate in background
+      void get(historyCacheKey, fetchHistoryForCache, { ttlMs: HISTORY_TTL_MS, dedupe: true });
+      return;
+    }
+
+    // Not in cache or stale - fetch and update UI
     try {
       const res = await fetch("/api/ai/tutor/conversations?limit=20");
       if (!res.ok) {
@@ -112,20 +146,21 @@ export function TutorChat({
         if (!quiet) setHistoryError(msg);
         return;
       }
-      const data = (await res.json()) as { conversations: ConversationListItem[] };
+      const data = (await res.json()) as HistoryPayload;
       setHistoryItems(data.conversations ?? []);
     } catch {
       if (!quiet) setHistoryError("Couldn't load conversations.");
     } finally {
       if (!quiet) setHistoryLoading(false);
     }
-  }, []);
+  }, [get, getEntry]);
 
-  // Load once for the desktop sidebar; the drawer also refreshes on open.
+  // Load once for the desktop sidebar; the drawer uses cached data.
   useEffect(() => {
     void fetchHistory(true);
   }, [fetchHistory]);
 
+  // When drawer opens, fetchHistory will use cache if fresh
   useEffect(() => {
     if (showHistory) void fetchHistory();
   }, [showHistory, fetchHistory]);
@@ -155,6 +190,7 @@ export function TutorChat({
         throw new Error(tutorFailureMessage(res.status, payload));
       }
       setHistoryItems((prev) => prev.filter((c) => c.id !== id));
+      invalidate(historyCacheKey); // Invalidate cache
       if (conversationId === id) {
         // Clear current chat if we deleted the open one
         handleStartNewChat();
@@ -465,6 +501,7 @@ export function TutorChat({
             setCurrentInput(null);
             sendingRef.current = false;
             abortControllerRef.current = null;
+            invalidate(historyCacheKey); // Invalidate conversation list cache
             void fetchHistory(true);
             return;
           }

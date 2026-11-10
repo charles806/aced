@@ -7,7 +7,7 @@ import { Bell, Clock, LogOut, Settings } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/useTheme";
-import { logout } from "@/app/actions/auth";
+import { useClientLogout } from "@/app/lib/client-auth";
 import { clearStudyTimerStorage } from "@/app/lib/study-timer-storage";
 import { getNavItemLabel } from "./nav-config";
 import { useStudyTimer } from "@/app/lib/study-timer-context";
@@ -27,10 +27,10 @@ function StudyTimerIndicator() {
 
 export function Topbar({ name }: { name: string }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { dark, toggle } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const clientLogout = useClientLogout();
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -44,9 +44,7 @@ export function Topbar({ name }: { name: string }) {
 
   const handleLogout = async () => {
     setMenuOpen(false);
-    clearStudyTimerStorage();
-    await logout();
-    router.push("/signin");
+    await clientLogout();
   };
 
   return (

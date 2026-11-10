@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, type ApiResult } from "@/app/lib/api-client";
+import { useDataCache, buildCacheKey } from "@/app/lib/data-cache";
 
 export type Quiz = {
   id: string;
@@ -49,12 +50,28 @@ export type QuizzesState =
 type QuizzesPayload = { quizzes: Quiz[] };
 
 const LOAD_NOT_FOUND_FALLBACK = "Your quizzes could not be found.";
+const QUIZZES_TTL_MS = 60_000; // 60 seconds
+
+type CacheResult<T> = { data: T | undefined; status: "loading" | "ready" | "error"; error?: string; unauthorized?: boolean };
+
+function toApiResult<T>(res: CacheResult<T>): ApiResult<T> {
+  if (res.status === "ready" && res.data) {
+    return { ok: true, data: res.data };
+  }
+  if (res.status === "error") {
+    return { ok: false, failure: { kind: res.unauthorized ? "unauthorized" : "server", message: res.error ?? "Failed to load" } };
+  }
+  return { ok: false, failure: { kind: "server", message: "Loading" } };
+}
 
 export function useQuizzes() {
+  const { get, invalidate, getEntry } = useDataCache();
   const [state, setState] = useState<QuizzesState>({ status: "loading" });
 
+  const cacheKey = "/api/quizzes";
+
   const fetchQuizzes = useCallback(async (): Promise<ApiResult<QuizzesPayload>> => {
-    return apiRequest<QuizzesPayload>("/api/quizzes", {
+    return apiRequest<QuizzesPayload>(cacheKey, {
       notFoundMessage: LOAD_NOT_FOUND_FALLBACK,
     });
   }, []);
@@ -80,19 +97,36 @@ export function useQuizzes() {
   useEffect(() => {
     let ignore = false;
 
-    void fetchQuizzes().then((result) => {
-      if (!ignore) applyResult(result);
+    const cached = getEntry<QuizzesPayload>(cacheKey);
+    if (cached && cached.status === "ready") {
+      const isStale = Date.now() - cached.lastFetched > QUIZZES_TTL_MS;
+      if (!isStale) {
+        applyResult({ ok: true, data: cached.data });
+        // Revalidate in background
+        void get(cacheKey, fetchQuizzes, { ttlMs: QUIZZES_TTL_MS, dedupe: true }).then((res) => {
+          if (!ignore && res.status === "ready" && res.data) {
+            applyResult({ ok: true, data: res.data });
+          }
+        });
+        return;
+      }
+    }
+
+    void get(cacheKey, fetchQuizzes, { ttlMs: QUIZZES_TTL_MS, dedupe: true }).then((res) => {
+      if (!ignore) {
+        applyResult(toApiResult(res));
+      }
     });
 
     return () => {
       ignore = true;
     };
-  }, [fetchQuizzes, applyResult]);
+  }, [get, getEntry, cacheKey, fetchQuizzes, applyResult]);
 
   const reload = useCallback(() => {
     setState({ status: "loading" });
-    void fetchQuizzes().then(applyResult);
-  }, [fetchQuizzes, applyResult]);
+    void get(cacheKey, fetchQuizzes, { ttlMs: 0, dedupe: false }).then((res) => applyResult(toApiResult(res)));
+  }, [get, cacheKey, fetchQuizzes, applyResult]);
 
   const setQuizzes = useCallback(
     (update: (previous: Quiz[]) => Quiz[]) => {
@@ -101,8 +135,9 @@ export function useQuizzes() {
           ? { status: "ready", quizzes: update(current.quizzes) }
           : current
       );
+      invalidate(cacheKey);
     },
-    []
+    [invalidate, cacheKey]
   );
 
   const addQuiz = useCallback((quiz: Quiz) => {
@@ -111,20 +146,20 @@ export function useQuizzes() {
         ? { status: "ready", quizzes: [quiz, ...current.quizzes] }
         : current
     );
-  }, []);
+    invalidate(cacheKey);
+  }, [invalidate, cacheKey]);
 
   const updateQuiz = useCallback((quiz: Quiz) => {
     setState((current) =>
       current.status === "ready"
         ? {
             status: "ready",
-            quizzes: current.quizzes.map((item) =>
-              item.id === quiz.id ? quiz : item
-            ),
+            quizzes: current.quizzes.map((item) => (item.id === quiz.id ? quiz : item)),
           }
         : current
     );
-  }, []);
+    invalidate(cacheKey);
+  }, [invalidate, cacheKey]);
 
   const removeQuiz = useCallback((quizId: string) => {
     setState((current) =>
@@ -135,7 +170,8 @@ export function useQuizzes() {
           }
         : current
     );
-  }, []);
+    invalidate(cacheKey);
+  }, [invalidate, cacheKey]);
 
   return {
     state,
