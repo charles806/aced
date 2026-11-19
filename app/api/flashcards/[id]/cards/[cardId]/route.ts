@@ -1,103 +1,83 @@
-import { jsonError, safeJsonBody } from "@/app/lib/api";
-import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { validateCardFields } from "@/app/lib/ai/flashcards-prompt";
+import { flashcardService } from "@/app/lib/services";
+import {
+  success,
+  unauthorized,
+  notFound,
+  validationError,
+  internalError,
+} from "@/app/lib/responses";
+import { cardIdParamSchema, updateCardSchema } from "@/app/lib/validators";
 
 export const runtime = "nodejs";
 
-async function findOwnDeck(userId: string, deckId: string) {
-  return prisma.flashcardDeck.findFirst({
-    where: { id: deckId, userId },
-  });
-}
-
-async function findOwnCard(userId: string, deckId: string, cardId: string) {
-  const deck = await findOwnDeck(userId, deckId);
-  if (!deck) return null;
-  return prisma.flashcard.findFirst({
-    where: { id: cardId, deckId },
-  });
-}
-
 /**
- * PATCH /api/flashcards/[id]/cards/[cardId] — edit a card.
+ * PATCH /api/flashcards/[id]/cards/[cardId] — edit a card
  * Body: { front?, back? }
  */
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ id: string; cardId: string }> },
+  { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
-  const user = await getCurrentUser(req);
-  if (!user) return jsonError("Unauthorized", 401);
-
   const { id, cardId } = await params;
-  if (typeof id !== "string" || id.trim() === "") {
-    return jsonError("Deck ID is required", 400);
-  }
-  if (typeof cardId !== "string" || cardId.trim() === "") {
-    return jsonError("Card ID is required", 400);
-  }
-
-  const card = await findOwnCard(user.id, id.trim(), cardId.trim());
-  if (!card) return jsonError("Card not found", 404);
-
-  const jsonBody = await safeJsonBody(req);
-  if (!jsonBody) {
-    return jsonError("Invalid request body. Expected JSON.", 400);
-  }
-
-  const frontRaw = (jsonBody as Record<string, unknown>).front;
-  const backRaw = (jsonBody as Record<string, unknown>).back;
-  const result = validateCardFields(frontRaw, backRaw);
-  if ("error" in result) return jsonError(result.error, 400);
-
   try {
-    const updated = await prisma.flashcard.update({
-      where: { id: card.id },
-      data: { front: result.front, back: result.back },
-    });
-    return Response.json({
-      card: {
-        id: updated.id,
-        front: updated.front,
-        back: updated.back,
-        position: updated.position,
-      },
-    });
+    const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
+
+    const paramValidated = cardIdParamSchema.safeParse({ id, cardId });
+    if (!paramValidated.success) return validationError("Invalid deck ID or card ID");
+
+    const body = await req.json().catch(() => null);
+    if (!body) return validationError("Invalid request body. Expected JSON.");
+
+    const validated = updateCardSchema.safeParse(body);
+    if (!validated.success) {
+      return validationError("Validation failed", { issues: validated.error.flatten().fieldErrors });
+    }
+
+    if (Object.keys(validated.data).length === 0) {
+      return validationError("Nothing to update");
+    }
+
+    const result = await flashcardService.updateCard(user.id, paramValidated.data.id, paramValidated.data.cardId, validated.data);
+
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND" || result.error.code === "FORBIDDEN") return notFound("Card");
+      return internalError(result.error.message);
+    }
+
+    return success(result.data);
   } catch (error) {
-    console.error("PATCH /api/flashcards/[id]/cards/[cardId] failed:", error);
-    return jsonError("Something went wrong", 500);
+    console.error(`PATCH /api/flashcards/${id}/cards/${cardId} failed:`, error);
+    return internalError();
   }
 }
 
 /**
- * DELETE /api/flashcards/[id]/cards/[cardId] — delete a card.
+ * DELETE /api/flashcards/[id]/cards/[cardId] — delete a card
  */
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ id: string; cardId: string }> },
+  { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
-  const user = await getCurrentUser(req);
-  if (!user) return jsonError("Unauthorized", 401);
-
   const { id, cardId } = await params;
-  if (typeof id !== "string" || id.trim() === "") {
-    return jsonError("Deck ID is required", 400);
-  }
-  if (typeof cardId !== "string" || cardId.trim() === "") {
-    return jsonError("Card ID is required", 400);
-  }
-
-  const card = await findOwnCard(user.id, id.trim(), cardId.trim());
-  if (!card) return jsonError("Card not found", 404);
-
   try {
-    await prisma.flashcardProgress.deleteMany({ where: { cardId: card.id } });
-    await prisma.flashcard.delete({ where: { id: card.id } });
+    const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    return Response.json({ ok: true });
+    const paramValidated = cardIdParamSchema.safeParse({ id, cardId });
+    if (!paramValidated.success) return validationError("Invalid deck ID or card ID");
+
+    const result = await flashcardService.deleteCard(user.id, paramValidated.data.id, paramValidated.data.cardId);
+
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND") return notFound("Card");
+      return internalError(result.error.message);
+    }
+
+    return success({ deleted: true });
   } catch (error) {
-    console.error("DELETE /api/flashcards/[id]/cards/[cardId] failed:", error);
-    return jsonError("Something went wrong", 500);
+    console.error(`DELETE /api/flashcards/${id}/cards/${cardId} failed:`, error);
+    return internalError();
   }
 }

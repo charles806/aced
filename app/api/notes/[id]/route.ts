@@ -1,189 +1,143 @@
-import { jsonError, safeJsonBody } from "@/app/lib/api";
-import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { getSignedFileUrl, storage } from "@/app/lib/storage";
+import { noteService } from "@/app/lib/services";
+import {
+  success,
+  noContent,
+  unauthorized,
+  notFound,
+  validationError,
+  internalError,
+} from "@/app/lib/responses";
+import { updateNoteSchema, noteIdParamSchema, reextractNoteSchema } from "@/app/lib/validators";
 
 export const runtime = "nodejs";
 
+/**
+ * GET /api/notes/[id] — get a single note
+ */
 export async function GET(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  try {
     const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    if (!user) {
-        return jsonError("Unauthorized", 401);
+    const validated = noteIdParamSchema.safeParse({ id });
+    if (!validated.success) return validationError("Invalid note ID");
+
+    const result = await noteService.getById(user.id, validated.data.id);
+
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND") return notFound("Note");
+      return internalError(result.error.message);
     }
 
-    const { id } = await params;
-
-    try {
-        const note = await prisma.note.findFirst({
-            where: {
-                id,
-                userId: user.id,
-            },
-        });
-
-        if (!note) {
-            return jsonError("Note not found", 404);
-        }
-
-        return Response.json({
-            note: {
-                ...note,
-                signedUrl: await getSignedFileUrl(note.fileUrl),
-            },
-        });
-    } catch (error) {
-        console.error(`GET /api/notes/${id} failed:`, error);
-        return jsonError("Something went wrong", 500);
-    }
+    return success(result.data);
+  } catch (error) {
+    console.error(`GET /api/notes/${id} failed:`, error);
+    return internalError();
+  }
 }
 
+/**
+ * PATCH /api/notes/[id] — update a note
+ */
 export async function PATCH(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  try {
     const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    if (!user) {
-        return jsonError("Unauthorized", 401);
+    const paramValidated = noteIdParamSchema.safeParse({ id });
+    if (!paramValidated.success) return validationError("Invalid note ID");
+
+    const body = await req.json().catch(() => null);
+    if (!body) return validationError("Invalid request body. Expected JSON.");
+
+    const validated = updateNoteSchema.safeParse(body);
+    if (!validated.success) {
+      return validationError("Validation failed", { issues: validated.error.flatten().fieldErrors });
     }
 
-    const { id } = await params;
+    const result = await noteService.update(user.id, id, validated.data);
 
-    const body = await safeJsonBody(req);
-
-    if (!body) {
-        return jsonError(
-            "Invalid request body. Expected JSON with a title and subjectId.",
-            400
-        );
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND" || result.error.code === "FORBIDDEN") return notFound("Note");
+      if (result.error.code === "VALIDATION_ERROR") return validationError(result.error.message);
+      return internalError(result.error.message);
     }
 
-    const { title, subjectId, content } = body;
-
-    if (typeof title !== "string" || title.trim() === "") {
-        return jsonError("Note title is required", 400);
-    }
-
-    if (typeof subjectId !== "string" || subjectId.trim() === "") {
-        return jsonError("Subject ID is required", 400);
-    }
-
-    try {
-        const note = await prisma.note.findFirst({
-            where: {
-                id,
-                userId: user.id,
-            },
-        });
-
-        if (!note) {
-            return jsonError("Note not found", 404);
-        }
-
-        const subject = await prisma.subject.findFirst({
-            where: {
-                id: subjectId,
-                userId: user.id,
-            },
-        });
-
-        if (!subject) {
-            return jsonError("Subject not found", 404);
-        }
-
-        // Validate content for written notes
-        if (!note.fileUrl) {
-            if (content !== undefined && content !== null) {
-                if (typeof content !== "string" || content.trim() === "") {
-                    return jsonError(
-                        "Please add some content to your note.",
-                        400
-                    );
-                }
-            }
-        }
-
-        const updateData: { title: string; subjectId: string; content?: string; updatedAt: Date } = {
-            title: title.trim(),
-            subjectId: subject.id,
-            updatedAt: new Date(),
-        };
-
-        // Update content for written notes
-        if (!note.fileUrl && content !== undefined && content !== null && typeof content === "string") {
-            updateData.content = content.trim();
-        }
-
-        const updated = await prisma.note.update({
-            where: {
-                id: note.id,
-            },
-            data: updateData,
-        });
-
-        return Response.json({
-            note: {
-                ...updated,
-                signedUrl: await getSignedFileUrl(updated.fileUrl),
-            },
-        });
-    } catch (error) {
-        console.error(`PATCH /api/notes/${id} failed:`, error);
-        return jsonError("Something went wrong", 500);
-    }
+    return success(result.data);
+  } catch (error) {
+    console.error(`PATCH /api/notes/${id} failed:`, error);
+    return internalError();
+  }
 }
 
+/**
+ * DELETE /api/notes/[id] — delete a note
+ */
 export async function DELETE(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  try {
     const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    if (!user) {
-        return jsonError("Unauthorized", 401);
+    const validated = noteIdParamSchema.safeParse({ id });
+    if (!validated.success) return validationError("Invalid note ID");
+
+    const result = await noteService.delete(user.id, validated.data.id);
+
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND") return notFound("Note");
+      return internalError(result.error.message);
     }
 
-    const { id } = await params;
+    return noContent();
+  } catch (error) {
+    console.error(`DELETE /api/notes/${id} failed:`, error);
+    return internalError();
+  }
+}
 
-    try {
-        const note = await prisma.note.findFirst({
-            where: {
-                id,
-                userId: user.id,
-            },
-        });
+/**
+ * POST /api/notes/[id]/reextract — re-extract note content
+ */
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-        if (!note) {
-            return jsonError("Note not found", 404);
-        }
+    const validated = noteIdParamSchema.safeParse({ id });
+    if (!validated.success) return validationError("Invalid note ID");
 
-        if (note.fileUrl) {
-            try {
-                await storage.delete(note.fileUrl);
-            } catch (error) {
-                console.error(
-                    `DELETE /api/notes/${id} storage deletion failed:`,
-                    error
-                );
-                return jsonError("Something went wrong", 500);
-            }
-        }
+    // Validate empty body for re-extraction
+    const bodyValidated = reextractNoteSchema.safeParse({});
+    if (!bodyValidated.success) return validationError("Invalid request");
 
-        await prisma.note.delete({
-            where: {
-                id: note.id,
-            },
-        });
+    const result = await noteService.reextract(user.id, validated.data.id);
 
-        return Response.json({
-            message: "Note deleted successfully",
-        });
-    } catch (error) {
-        console.error(`DELETE /api/notes/${id} failed:`, error);
-        return jsonError("Something went wrong", 500);
+    if (!result.success) {
+      if (result.error.code === "NOT_FOUND") return notFound("Note");
+      if (result.error.code === "VALIDATION_ERROR") return validationError(result.error.message);
+      return internalError(result.error.message);
     }
+
+    return success(result.data);
+  } catch (error) {
+    console.error(`POST /api/notes/${id}/reextract failed:`, error);
+    return internalError();
+  }
 }

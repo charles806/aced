@@ -1,76 +1,76 @@
-import { createActivity } from "@/app/lib/activity";
-import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { subjectService } from "@/app/lib/services";
 import {
-    jsonError,
-    safeJsonBody,
-    validateSubjectName,
-} from "@/app/lib/api";
+  created,
+  paginated,
+  unauthorized,
+  validationError,
+  internalError,
+} from "@/app/lib/responses";
+import { createSubjectSchema, paginationSchema } from "@/app/lib/validators";
 
+/**
+ * GET /api/subject — list user's subjects with counts
+ */
 export async function GET(req: Request) {
+  try {
     const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    if (!user) {
-        return jsonError("Unauthorized", 401);
+    const { searchParams } = new URL(req.url);
+    const page = Number(searchParams.get("page")) || 1;
+    const limit = Number(searchParams.get("limit")) || 25;
+
+    const validated = paginationSchema.safeParse({ page, limit });
+    if (!validated.success) return validationError("Invalid pagination params");
+
+    const result = await subjectService.listPaginated(user.id, validated.data.page, validated.data.limit);
+
+    if (!result.success) {
+      return validationError(result.error.message);
     }
 
-    try {
-        const subjects = await prisma.subject.findMany({
-            where: {
-                userId: user.id,
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-
-        return Response.json({ subjects });
-    } catch (error) {
-        console.error("GET /api/subject failed:", error);
-        return jsonError("Something went wrong", 500);
-    }
+    return paginated(
+      result.data.items,
+      result.data.page,
+      result.data.limit,
+      result.data.total
+    );
+  } catch (error) {
+    console.error("GET /api/subject failed:", error);
+    return internalError();
+  }
 }
 
+/**
+ * POST /api/subject — create a new subject
+ */
 export async function POST(req: Request) {
+  try {
     const user = await getCurrentUser(req);
+    if (!user) return unauthorized();
 
-    if (!user) {
-        return jsonError("Unauthorized", 401);
+    const body = await req.json().catch(() => null);
+    if (!body) return validationError("Invalid request body. Expected JSON.");
+
+    const validated = createSubjectSchema.safeParse(body);
+    if (!validated.success) {
+      return validationError("Validation failed", { issues: validated.error.flatten().fieldErrors });
     }
 
-    const body = await safeJsonBody(req);
+    const result = await subjectService.create(user.id, validated.data);
 
-    if (!body) {
-        return jsonError(
-            "Invalid request body. Expected JSON with a subject name.",
-            400
-        );
+    if (!result.success) {
+      const status = result.error.code === "DATABASE_ERROR" ? 500 : 400;
+      return Response.json(
+        { error: { code: result.error.code, message: result.error.message } },
+        { status }
+      );
     }
 
-    const validated = validateSubjectName(body.name);
-
-    if ("error" in validated) {
-        return jsonError(validated.error, 400);
-    }
-
-    try {
-        const subject = await prisma.subject.create({
-            data: {
-                name: validated.name,
-                userId: user.id,
-            },
-        });
-
-        void createActivity({
-            userId: user.id,
-            type: "subject_created",
-            subjectId: subject.id,
-            label: `Created subject "${subject.name}"`,
-        });
-
-        return Response.json({ subject }, { status: 201 });
-    } catch (error) {
-        console.error("POST /api/subject failed:", error);
-        return jsonError("Something went wrong", 500);
-    }
+    return created(result.data);
+  } catch (error) {
+    console.error("POST /api/subject failed:", error);
+    return internalError();
+  }
 }

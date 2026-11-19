@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, CircleDollarSign, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Reveal } from "./reveal";
 import { Section } from "./section";
@@ -9,26 +9,17 @@ import { CountUp } from "@/components/dashboard/micro-motion";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const FREE_FEATURES = [
+const ALL_FEATURES = [
   "Subjects & notes",
-  "PDF and image uploads (3 notes max)",
+  "Unlimited PDF and image uploads",
   "Search and filtering",
-  "Basic study tracking",
+  "Study tracking",
   "Dashboard & statistics",
-  "AI Tutor (20 messages)",
-  "AI flashcards (1 deck)",
-  "AI quizzes (1 quiz)",
-];
-
-const PRO_FEATURES = [
-  "Everything in Free",
   "Unlimited AI Tutor messages",
   "AI summaries",
   "Unlimited AI flashcards",
   "Unlimited AI quizzes",
-  "Unlimited note uploads",
   "Advanced study insights",
-  "Future premium features",
 ];
 
 const LIST_VARIANTS = {
@@ -86,89 +77,47 @@ export function Pricing() {
           Pricing
         </p>
         <h2 className="mt-3 font-display text-3xl font-semibold leading-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
-          Start free. Go Pro when you&apos;re ready.
+          Completely free. Forever.
         </h2>
         <p className="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Every study tool that matters is free. Pro unlocks the AI
-          features for a few cups of coffee a month.
+          Every study tool is free — no limits, no subscriptions, no paywalls.
         </p>
       </Reveal>
 
-      <div className="mx-auto mt-14 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Free */}
+      <div className="mx-auto mt-14 max-w-xl">
         <Reveal className="flex">
-          <div className="flex w-full flex-col rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative flex w-full flex-col rounded-2xl border-2 border-accent-500 bg-white p-8 shadow-[0_8px_32px_-12px_rgba(255,78,136,0.4)] dark:animate-none dark:bg-zinc-900 dark:shadow-[0_8px_32px_-12px_rgba(255,78,136,0.35)]">
+            <div className="absolute right-0 top-0 rounded-bl-xl bg-accent-500 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white">
+              Free forever
+            </div>
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Free
+              <h3 className="flex items-center gap-2 font-display text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                ACED
+                <Sparkles className="h-4 w-4 text-accent-500" aria-hidden="true" />
               </h3>
-              <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                forever
-              </span>
             </div>
             <p className="mt-4 flex items-baseline gap-1">
               <CountUp
                 value="$0"
                 className="font-display text-4xl font-semibold text-zinc-900 dark:text-zinc-50"
               />
-              <span className="ml-1 text-base font-normal text-zinc-500 dark:text-zinc-400">
-                / never
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                / forever
               </span>
             </p>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-              Everything you need to organize and study.
+              Unlock the full AI-powered study experience at no cost.
             </p>
             <FeatureList
-              items={FREE_FEATURES}
+              items={ALL_FEATURES}
               listClassName="mt-6 flex-1 space-y-3"
               icon={Check}
             />
             <Link
               href="/signup"
-              className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/30 dark:border-zinc-700 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
-            >
-              Get started free
-            </Link>
-          </div>
-        </Reveal>
-
-        {/* Pro */}
-        <Reveal delay={0.08} className="flex">
-          <div className="relative flex w-full animate-float-slow flex-col overflow-hidden rounded-2xl border-2 border-accent-500 bg-white p-8 shadow-[0_8px_32px_-12px_rgba(255,78,136,0.4)] dark:animate-none dark:bg-zinc-900 dark:shadow-[0_8px_32px_-12px_rgba(255,78,136,0.35)]"
-            style={{ ["--tilt" as string]: "0deg" }}
-          >
-            <div className="absolute right-0 top-0 rounded-bl-xl bg-accent-500 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white">
-              Best for exam season
-            </div>
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-display text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Pro
-                <Sparkles className="h-4 w-4 text-accent-500" aria-hidden="true" />
-              </h3>
-            </div>
-            <p className="mt-4 flex items-baseline gap-1">
-              <CountUp
-                value="$1.99"
-                className="font-display text-4xl font-semibold text-zinc-900 dark:text-zinc-50"
-              />
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                / 30 days
-              </span>
-            </p>
-            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-              Unlock the full AI-powered study experience.
-            </p>
-            <FeatureList
-              items={PRO_FEATURES}
-              listClassName="mt-6 flex-1 space-y-3"
-              icon={CircleDollarSign}
-            />
-            <Link
-              href="/signup"
               className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-accent-500/30 transition hover:-translate-y-0.5 hover:bg-accent-600 hover:shadow-lg hover:shadow-accent-500/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/40"
             >
-              Start Learning
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Get started free
             </Link>
           </div>
         </Reveal>
@@ -176,7 +125,7 @@ export function Pricing() {
 
       <Reveal delay={0.15} className="mt-8 text-center">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Cancel or manage your subscription anytime from your dashboard.
+          No subscription to manage — just sign up and start studying.
         </p>
       </Reveal>
     </Section>

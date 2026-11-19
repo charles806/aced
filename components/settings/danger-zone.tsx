@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Dialog } from "@/components/dashboard/dialog";
 import { SettingsBanner } from "./settings-banner";
 import { useSettingsNotice } from "./use-settings-notice";
+import { apiRequest } from "@/app/lib/api-client";
 
 type DangerZoneProps = {
   name: string;
@@ -14,12 +16,14 @@ const DESTRUCTIVE_CLASSES =
   "inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-600/30 transition hover:bg-red-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function DangerZone({ name }: DangerZoneProps) {
+  const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [typedName, setTypedName] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { notice, show } = useSettingsNotice();
 
-  const confirmDisabled = typedName.trim() !== name.trim();
+  const confirmDisabled = typedName.trim() !== name.trim() || deleting;
 
   const openDialog = () => {
     setTypedName("");
@@ -27,24 +31,39 @@ export function DangerZone({ name }: DangerZoneProps) {
     setDialogOpen(true);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (confirmDisabled) {
       setFieldError("Enter your name to confirm");
       return;
     }
 
-    setDialogOpen(false);
-    setTypedName("");
+    setDeleting(true);
     setFieldError(null);
 
-    // Account deletion has no backend endpoint yet. Surface the state
-    // explicitly instead of pretending the action succeeded. This UI is
-    // intentionally isolated so a secure deletion flow can be connected here.
-    show({
-      kind: "error",
-      message:
-        "Account deletion isn't available yet. Please contact support for help with your account.",
-    });
+    try {
+      const result = await apiRequest<{ ok: boolean }>("/api/me", {
+        method: "DELETE",
+      });
+
+      if (!result.ok) {
+        if (result.failure.kind === "unauthorized") {
+          router.replace("/signin");
+          return;
+        }
+        show({ kind: "error", message: result.failure.message });
+        setDeleting(false);
+        return;
+      }
+
+      // Success - redirect to signin page
+      router.replace("/signin");
+    } catch (error) {
+      show({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Something went wrong.",
+      });
+      setDeleting(false);
+    }
   };
 
   return (
@@ -125,7 +144,14 @@ export function DangerZone({ name }: DangerZoneProps) {
             disabled={confirmDisabled}
             className={DESTRUCTIVE_CLASSES}
           >
-            Permanently delete
+            {deleting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />
+                Deleting…
+              </>
+            ) : (
+              "Permanently delete"
+            )}
           </button>
         </div>
       </Dialog>

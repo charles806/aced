@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { jsonError, safeJsonBody } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { requireProAccess } from "@/app/lib/billing/guard";
 import { generateText } from "@/app/lib/ai/ai";
 import {
   buildSummaryInput,
@@ -67,14 +66,7 @@ export async function GET(
     return jsonError("Unauthorized", 401);
   }
 
-  // 2. Pro access. Server-side only — the frontend never decides this.
-  const proAccess = await requireProAccess(user.id);
-
-  if (!proAccess.ok) {
-    return proAccess.response;
-  }
-
-  // 3. Validate + find the note — always scoped to the authenticated user.
+  // 2. Validate + find the note — always scoped to the authenticated user.
   const { id } = await params;
 
   if (typeof id !== "string" || id.trim() === "") {
@@ -96,7 +88,7 @@ export async function GET(
     return jsonError("Note not found", 404);
   }
 
-  // 4. Readiness: same rule as the Tutor — file notes need finished extraction,
+  // 3. Readiness: same rule as the Tutor — file notes need finished extraction,
   //    written notes need non-empty content.
   if (!resolveSummaryText(note)) {
     return jsonError(NOT_READY_MESSAGE, 409);
@@ -124,14 +116,7 @@ export async function POST(
     return jsonError("Unauthorized", 401);
   }
 
-  // 2. Pro access. Server-side only — the frontend never decides this.
-  const proAccess = await requireProAccess(user.id);
-
-  if (!proAccess.ok) {
-    return proAccess.response;
-  }
-
-  // 3. Validate body + id. Only `force` / `length` are read.
+  // 2. Validate body + id. Only `force` / `length` are read.
   const { id } = await params;
 
   if (typeof id !== "string" || id.trim() === "") {
@@ -149,7 +134,7 @@ export async function POST(
     return jsonError('Length must be "short" or "detailed"', 400);
   }
 
-  // 4. Find the note — always scoped to the authenticated user. Never
+  // 3. Find the note — always scoped to the authenticated user. Never
   //    `findUnique` without the user scope.
   let note;
 
@@ -166,7 +151,7 @@ export async function POST(
     return jsonError("Note not found", 404);
   }
 
-  // 5. The summarizer needs usable study material.
+  // 4. The summarizer needs usable study material.
   const noteText = resolveSummaryText(note);
 
   if (!noteText) {
@@ -178,7 +163,7 @@ export async function POST(
 
   const stale = isSummaryStale(note);
 
-  // 6. Cache hit: completed, fresh, same length, not forced → zero model calls.
+  // 5. Cache hit: completed, fresh, same length, not forced → zero model calls.
   if (
     note.summaryStatus === "completed" &&
     !stale &&
@@ -188,7 +173,7 @@ export async function POST(
     return NextResponse.json(toSummaryPayload(note));
   }
 
-  // 7. Double-POST guard: a recently-started generation is still running.
+  // 6. Double-POST guard: a recently-started generation is still running.
   if (
     note.summaryStatus === "pending" &&
     note.summaryUpdatedAt &&
@@ -198,7 +183,7 @@ export async function POST(
     return jsonError("Summary already generating", 409);
   }
 
-  // 8. Mark pending first so a concurrent POST sees the guard above.
+  // 7. Mark pending first so a concurrent POST sees the guard above.
   try {
     await prisma.note.update({
       where: { id: note.id },
@@ -209,7 +194,7 @@ export async function POST(
     return jsonError("Something went wrong", 500);
   }
 
-  // 9. Generate. Provider errors are logged server-side and surfaced as one
+  // 8. Generate. Provider errors are logged server-side and surfaced as one
   //    generic 502 — never leaked to the client.
   let summary: string;
 
@@ -254,7 +239,7 @@ export async function POST(
     return jsonError(MODEL_UNAVAILABLE_MESSAGE, 502);
   }
 
-  // 10. Persist the artifact. `summaryModel` records the model; default to the
+  // 9. Persist the artifact. `summaryModel` records the model; default to the
   //     env-configured model name when set.
   const modelName = process.env.DEFAULT_MODEL ?? null;
 

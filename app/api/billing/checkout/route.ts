@@ -2,8 +2,11 @@ import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { createBachsCheckoutSession } from "@/app/lib/billing/create-bachs-checkout-session";
-import { PRO_SUBSCRIPTION_STATUSES } from "@/app/lib/billing/entitlement";
 import { getDefaultPlan } from "@/app/lib/billing/plans";
+
+const PRO_SUBSCRIPTION_STATUSES = new Set([
+  "active", "trialing", "past_due", "unpaid", "canceled", "paused", "cancelled"
+]);
 
 /** Best-effort display name for the Bachs customer (required for new customers). */
 function customerName(user: { email: string | null; metadata: unknown }): string | undefined {

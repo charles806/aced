@@ -17,11 +17,13 @@ function pickSettings(row: {
     studyReminders: boolean;
     productUpdates: boolean;
     emailNotifications: boolean;
+    seenFreeAnnouncement: boolean;
 }) {
     return {
         studyReminders: row.studyReminders,
         productUpdates: row.productUpdates,
         emailNotifications: row.emailNotifications,
+        seenFreeAnnouncement: row.seenFreeAnnouncement,
     };
 }
 
@@ -40,7 +42,7 @@ export async function GET(req: Request) {
         return Response.json({
             settings: row
                 ? pickSettings(row)
-                : { ...DEFAULT_SETTINGS },
+                : { ...DEFAULT_SETTINGS, seenFreeAnnouncement: false },
         });
     } catch (error) {
         console.error("GET /api/me/settings failed:", error);

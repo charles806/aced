@@ -2,16 +2,12 @@ import { NextResponse } from "next/server";
 import { jsonError, safeJsonBody } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { requireProAccess } from "@/app/lib/billing/guard";
 
 export const runtime = "nodejs";
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser(req);
   if (!user) return jsonError("Unauthorized", 401);
-
-  const proAccess = await requireProAccess(user.id);
-  if (!proAccess.ok) return proAccess.response;
 
   const { id } = await params;
   const conversationId = id?.trim();
@@ -36,9 +32,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser(req);
   if (!user) return jsonError("Unauthorized", 401);
-
-  const proAccess = await requireProAccess(user.id);
-  if (!proAccess.ok) return proAccess.response;
 
   const { id } = await params;
   const conversationId = id?.trim();
