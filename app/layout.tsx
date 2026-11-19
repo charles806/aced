@@ -3,7 +3,6 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { DataCacheProviderWrapper } from "@/components/providers/data-cache-provider";
-import { FreeAnnouncementProvider } from "@/components/free-announcement-provider";
 import "./globals.css";
 
 
@@ -59,9 +58,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="min-h-full flex flex-col">
-        <DataCacheProviderWrapper>
-          <FreeAnnouncementProvider>{children}</FreeAnnouncementProvider>
-        </DataCacheProviderWrapper>
+        <DataCacheProviderWrapper>{children}</DataCacheProviderWrapper>
         <Analytics />
       </body>
     </html>

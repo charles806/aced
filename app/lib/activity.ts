@@ -1,7 +1,17 @@
 import { prisma } from "@/app/lib/auth";
-import { ACTIVITY_TYPES, type ActivityType } from "@/app/lib/config/constants";
 
-export type { ActivityType };
+export type ActivityType =
+  | "note_created"
+  | "note_opened"
+  | "subject_created"
+  | "study_session_completed"
+  | "flashcard_deck_created"
+  | "flashcard_deck_deleted"
+  | "quiz_created"
+  | "quiz_updated"
+  | "quiz_deleted"
+  | "quiz_attempt_started"
+  | "quiz_attempt_submitted";
 
 type CreateActivityInput = {
   userId: string;

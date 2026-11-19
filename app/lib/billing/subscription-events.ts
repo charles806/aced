@@ -19,6 +19,7 @@
 import { prisma } from "@/app/lib/auth";
 import type { NormalizedEvent } from "@radonsdk/payments";
 import { Prisma } from "@/app/generated/prisma/client";
+import { normalizeStatus } from "./entitlement";
 import {
     handleAnnualPaymentSucceeded,
     handleAnnualPaymentFailed,
@@ -26,10 +27,6 @@ import {
     handleAnnualDisputeCreated,
     handleAnnualDisputeUpdated,
 } from "./annual-events";
-
-function normalizeStatus(status: string): string {
-    return status === "canceled" ? "cancelled" : status;
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)

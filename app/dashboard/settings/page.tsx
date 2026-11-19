@@ -151,10 +151,10 @@ const sections =
       <Reveal direction="up" delay={0.2}>
         <SettingsSection
           id="subscription"
-          title="Plan"
-          description="ACED is completely free with no limits."
+          title="Subscription"
+          description="Your ACED plan and billing details."
         >
-          <UpgradeCard />
+          <UpgradeCard onSignIn={() => router.replace("/signin")} />
         </SettingsSection>
       </Reveal>
 

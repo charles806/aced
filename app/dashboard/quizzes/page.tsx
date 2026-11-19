@@ -266,7 +266,8 @@ export default function QuizzesPage() {
             icon={FileText}
             title="No quizzes yet"
             description={
-              "Create a quiz manually or generate one from your notes."
+              "Create a quiz manually or generate one from your notes. " +
+              "Quizzes are an ACED Pro feature."
             }
             cta={{ label: "Create a quiz", onClick: openCreate }}
           />

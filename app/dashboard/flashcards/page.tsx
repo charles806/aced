@@ -248,7 +248,8 @@ export default function FlashcardsPage() {
             icon={FileText}
             title="No flashcard decks yet"
             description={
-              "Create a deck manually or generate one from your notes."
+              "Create a deck manually or generate one from your notes. " +
+              "Flashcards are an ACED Pro feature."
             }
             cta={{ label: "Create a deck", onClick: openCreate }}
           />

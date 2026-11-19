@@ -1,8 +1,17 @@
 /**
- * Centralized feature access definitions for ACED.
+ * Centralized feature access definitions for ACED Free vs Pro tiers.
  *
- * All features are now free for all authenticated users.
- * This file is kept for compatibility but no longer enforces restrictions.
+ * This is the single source of truth for which features require a Pro
+ * subscription. Future AI routes and premium components should import
+ * from here rather than scattering hardcoded checks.
+ *
+ * Usage in API routes:
+ *   import { requiresPro } from "@/app/lib/billing/features";
+ *   if (requiresPro("ai_tutor")) { /* guard with hasProAccess *\/ }
+ *
+ * Usage in frontend:
+ *   import { FREE_FEATURES, PRO_FEATURES } from "@/app/lib/billing/features";
+ *   const canUse = isPro ? PRO_FEATURES.has(feature) : FREE_FEATURES.has(feature);
  */
 
 export type FeatureKey =
@@ -19,7 +28,7 @@ export type FeatureKey =
     | "advanced_insights";
 
 /**
- * All features are available to all users.
+ * Features available to all users (Free tier).
  */
 export const FREE_FEATURES: Set<FeatureKey> = new Set([
     "subjects",
@@ -28,6 +37,13 @@ export const FREE_FEATURES: Set<FeatureKey> = new Set([
     "search",
     "study_tracking",
     "dashboard",
+]);
+
+/**
+ * Features that require an active Pro subscription.
+ * Pro users also have access to everything in FREE_FEATURES.
+ */
+export const PRO_FEATURES: Set<FeatureKey> = new Set([
     "ai_tutor",
     "ai_summaries",
     "ai_flashcards",
@@ -36,23 +52,15 @@ export const FREE_FEATURES: Set<FeatureKey> = new Set([
 ]);
 
 /**
- * No features require Pro access anymore.
- * @deprecated All features are free.
- */
-export const PRO_FEATURES: Set<FeatureKey> = new Set();
-
-/**
  * Check whether a feature requires Pro access.
- * Always returns false since all features are free.
- * @deprecated Always returns false.
+ * Returns `true` for Pro-only features, `false` for free features.
  */
 export function requiresPro(feature: FeatureKey): boolean {
-    return false;
+    return PRO_FEATURES.has(feature);
 }
 
 /**
  * Check whether a feature is available to free users.
- * Always returns true since all features are free.
  */
 export function isFreeFeature(feature: FeatureKey): boolean {
     return FREE_FEATURES.has(feature);

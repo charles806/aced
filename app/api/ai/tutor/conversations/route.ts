@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { requireProAccess } from "@/app/lib/billing/guard";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,9 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const user = await getCurrentUser(req);
   if (!user) return jsonError("Unauthorized", 401);
+
+  const proAccess = await requireProAccess(user.id);
+  if (!proAccess.ok) return proAccess.response;
 
   const { searchParams } = new URL(req.url);
   const noteIdParam = searchParams.get("noteId");

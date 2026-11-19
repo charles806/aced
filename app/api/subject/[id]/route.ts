@@ -1,109 +1,130 @@
+import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { subjectService } from "@/app/lib/services";
 import {
-  success,
-  noContent,
-  unauthorized,
-  notFound,
-  validationError,
-  internalError,
-} from "@/app/lib/responses";
-import { updateSubjectSchema, subjectIdParamSchema } from "@/app/lib/validators";
+    jsonError,
+    safeJsonBody,
+    validateSubjectName,
+} from "@/app/lib/api";
 
-/**
- * GET /api/subject/[id] — get a single subject
- */
 export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  try {
     const user = await getCurrentUser(req);
-    if (!user) return unauthorized();
 
-    const validated = subjectIdParamSchema.safeParse({ id });
-    if (!validated.success) return validationError("Invalid subject ID");
-
-    const result = await subjectService.getById(user.id, validated.data.id);
-
-    if (!result.success) {
-      if (result.error.code === "NOT_FOUND") return notFound("Subject");
-      return internalError(result.error.message);
+    if (!user) {
+        return jsonError("Unauthorized", 401);
     }
 
-    return success(result.data);
-  } catch (error) {
-    console.error(`GET /api/subject/${id} failed:`, error);
-    return internalError();
-  }
+    const { id } = await params;
+
+    try {
+        const subject = await prisma.subject.findFirst({
+            where: {
+                id,
+                userId: user.id,
+            },
+        });
+
+        if (!subject) {
+            return jsonError("Subject not found", 404);
+        }
+
+        return Response.json({ subject });
+    } catch (error) {
+        console.error(`GET /api/subject/${id} failed:`, error);
+        return jsonError("Something went wrong", 500);
+    }
 }
 
-/**
- * PATCH /api/subject/[id] — update a subject
- */
 export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  try {
     const user = await getCurrentUser(req);
-    if (!user) return unauthorized();
 
-    const paramValidated = subjectIdParamSchema.safeParse({ id });
-    if (!paramValidated.success) return validationError("Invalid subject ID");
-
-    const body = await req.json().catch(() => null);
-    if (!body) return validationError("Invalid request body. Expected JSON.");
-
-    const validated = updateSubjectSchema.safeParse(body);
-    if (!validated.success) {
-      return validationError("Validation failed", { issues: validated.error.flatten().fieldErrors });
+    if (!user) {
+        return jsonError("Unauthorized", 401);
     }
 
-    const result = await subjectService.update(user.id, id, validated.data);
+    const { id } = await params;
 
-    if (!result.success) {
-      const status = result.error.code === "NOT_FOUND" || result.error.code === "FORBIDDEN" ? 404 : 500;
-      return Response.json(
-        { error: { code: result.error.code, message: result.error.message } },
-        { status }
-      );
+    const body = await safeJsonBody(req);
+
+    if (!body) {
+        return jsonError(
+            "Invalid request body. Expected JSON with a subject name.",
+            400
+        );
     }
 
-    return success(result.data);
-  } catch (error) {
-    console.error(`PATCH /api/subject/${id} failed:`, error);
-    return internalError();
-  }
+    const validated = validateSubjectName(body.name);
+
+    if ("error" in validated) {
+        return jsonError(validated.error, 400);
+    }
+
+    try {
+        const find = await prisma.subject.findFirst({
+            where: {
+                id,
+                userId: user.id,
+            },
+        });
+
+        if (!find) {
+            return jsonError("Subject not found", 404);
+        }
+
+        const subject = await prisma.subject.update({
+            where: {
+                id,
+            },
+            data: {
+                name: validated.name,
+            },
+        });
+
+        return Response.json({ subject });
+    } catch (error) {
+        console.error(`PATCH /api/subject/${id} failed:`, error);
+        return jsonError("Something went wrong", 500);
+    }
 }
 
-/**
- * DELETE /api/subject/[id] — delete a subject
- */
 export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  try {
     const user = await getCurrentUser(req);
-    if (!user) return unauthorized();
 
-    const validated = subjectIdParamSchema.safeParse({ id });
-    if (!validated.success) return validationError("Invalid subject ID");
-
-    const result = await subjectService.delete(user.id, validated.data.id);
-
-    if (!result.success) {
-      if (result.error.code === "NOT_FOUND") return notFound("Subject");
-      return internalError(result.error.message);
+    if (!user) {
+        return jsonError("Unauthorized", 401);
     }
 
-    return noContent();
-  } catch (error) {
-    console.error(`DELETE /api/subject/${id} failed:`, error);
-    return internalError();
-  }
+    const { id } = await params;
+
+    try {
+        const find = await prisma.subject.findFirst({
+            where: {
+                id,
+                userId: user.id,
+            },
+        });
+
+        if (!find) {
+            return jsonError("Subject not found", 404);
+        }
+
+        await prisma.subject.delete({
+            where: {
+                id,
+            },
+        });
+
+        return Response.json({ message: "Subject deleted successfully" });
+    } catch (error) {
+        console.error(`DELETE /api/subject/${id} failed:`, error);
+        return jsonError("Something went wrong", 500);
+    }
 }

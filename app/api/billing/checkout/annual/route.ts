@@ -3,11 +3,8 @@ import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { payments } from "@/app/lib/payments";
 import { getOneTimePlan } from "@/app/lib/billing/plans";
+import { PRO_SUBSCRIPTION_STATUSES } from "@/app/lib/billing/entitlement";
 import { decimalStringToMinor, validateDecimalAmount } from "@/app/lib/billing/decimal";
-
-const PRO_SUBSCRIPTION_STATUSES = new Set([
-  "active", "trialing", "past_due", "unpaid", "canceled", "paused", "cancelled"
-]);
 
 function customerName(user: { email: string | null; metadata: unknown }): string | undefined {
     const metadata =

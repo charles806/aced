@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Sparkles } from "lucide-react";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { TutorText } from "@/components/tutor/tutor-format";
 
 export type SummaryLengthOption = "short" | "detailed";
 
@@ -20,7 +20,7 @@ type LoadState =
   | {
       status: "error";
       message: string;
-      kind: "unauthorized" | "not-ready" | "generic";
+      kind: "pro" | "unauthorized" | "not-ready" | "generic";
     }
   | { status: "ready"; data: SummaryPayload };
 
@@ -37,6 +37,8 @@ const SESSION_MESSAGE = "Your session has expired. Please sign in again.";
 const errorBannerClasses =
   "rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/50 dark:bg-red-950/40 dark:text-red-300";
 
+const proBannerClasses =
+  "rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/50 dark:bg-amber-950/40 dark:text-amber-300";
 
 const notReadyBannerClasses =
   "rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/50 dark:bg-amber-950/40 dark:text-amber-300";
@@ -123,6 +125,11 @@ export function NoteSummary({
     if (!response.ok) {
       const message = serverMessageOf(payload) ?? GENERIC_MESSAGE;
 
+      if (response.status === 403) {
+        setState({ status: "error", message, kind: "pro" });
+        return;
+      }
+
       if (response.status === 401) {
         setState({ status: "error", message: SESSION_MESSAGE, kind: "unauthorized" });
         return;
@@ -203,6 +210,15 @@ export function NoteSummary({
 
     if (!response.ok) {
       const message = serverMessageOf(payload);
+
+      if (response.status === 403) {
+        setState({
+          status: "error",
+          message: message ?? "ACED Pro is required",
+          kind: "pro",
+        });
+        return;
+      }
 
       if (response.status === 401) {
         setActionError({ message: SESSION_MESSAGE, unauthorized: true });
@@ -290,7 +306,17 @@ export function NoteSummary({
       ) : null}
 
       {state.status === "error" ? (
-        state.kind === "unauthorized" ? (
+        state.kind === "pro" ? (
+          <div className={`mt-3 ${proBannerClasses}`}>
+            <p>{state.message}</p>
+            <Link
+              href="/#pricing"
+              className="mt-1 inline-block font-medium underline underline-offset-2"
+            >
+              Upgrade to ACED Pro
+            </Link>
+          </div>
+        ) : state.kind === "unauthorized" ? (
           <div className={`mt-3 ${errorBannerClasses}`} role="alert">
             <p>{state.message}</p>
             <Link
@@ -348,7 +374,7 @@ export function NoteSummary({
               </div>
 
               <div className="mt-2 text-zinc-700 dark:text-zinc-300">
-                <MarkdownRenderer>{state.data.summary}</MarkdownRenderer>
+                <TutorText text={state.data.summary} />
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">

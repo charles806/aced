@@ -1,18 +1,21 @@
 /**
- * Usage limits — all users now have unlimited access.
+ * Free tier usage limits and enforcement.
  *
- * This file is kept for compatibility but no longer enforces restrictions.
- * All limits are effectively infinite.
+ * Free tier limits:
+ * - 20 AI chat messages total
+ * - 1 flashcard deck generation
+ * - 1 quiz generation
+ * - 3 notes uploaded
  */
 
 import { prisma } from "@/app/lib/auth";
 
-/** No limits — all users have unlimited access. */
+/** Free tier limits — change these values to adjust limits. */
 export const FREE_LIMITS = {
-  aiChatMessages: -1,
-  flashcardDecks: -1,
-  quizzes: -1,
-  notesUploaded: -1,
+  aiChatMessages: 20,
+  flashcardDecks: 1,
+  quizzes: 1,
+  notesUploaded: 3,
 } as const;
 
 export type LimitKey = keyof typeof FREE_LIMITS;
@@ -24,12 +27,13 @@ export type UsageCounts = {
   notesUploaded: number;
 };
 
-/** Always returns true — Pro check is no longer needed. */
+/** Check if a user has Pro access (re-export for convenience). */
 export async function hasProAccess(userId: string): Promise<boolean> {
-  return true;
+  const { hasProAccess: checkPro } = await import("./entitlement");
+  return checkPro(userId);
 }
 
-/** Get current usage counts (for display only, not enforcement). */
+/** Get current usage counts for a free user. */
 export async function getUsage(userId: string): Promise<UsageCounts> {
   const usage = await prisma.freeUserUsage.findUnique({
     where: { userId },
@@ -53,20 +57,36 @@ export async function getUsage(userId: string): Promise<UsageCounts> {
   return usage;
 }
 
-/** Always allows — no limits enforced. */
+/** Check if a free user can perform an action (hasn't hit the limit). */
 export async function canUseFreeFeature(
   userId: string,
   feature: LimitKey
 ): Promise<{ allowed: boolean; remaining: number; limit: number }> {
-  return { allowed: true, remaining: -1, limit: -1 };
+  const isPro = await hasProAccess(userId);
+  if (isPro) {
+    return { allowed: true, remaining: -1, limit: -1 }; // -1 = unlimited
+  }
+
+  const usage = await getUsage(userId);
+  const limit = FREE_LIMITS[feature];
+  const current = usage[feature];
+  const remaining = Math.max(0, limit - current);
+
+  return {
+    allowed: current < limit,
+    remaining,
+    limit,
+  };
 }
 
-/** No-op — usage tracking kept for analytics but not enforced. */
+/** Increment usage count for a free user after a successful action. */
 export async function incrementUsage(
   userId: string,
   feature: LimitKey
 ): Promise<void> {
-  // Kept for analytics — could be removed entirely if not needed
+  const isPro = await hasProAccess(userId);
+  if (isPro) return; // Pro users don't count against limits
+
   await prisma.freeUserUsage.upsert({
     where: { userId },
     update: {
@@ -79,12 +99,23 @@ export async function incrementUsage(
   });
 }
 
-/** Returns unlimited for all features. */
+/** Get remaining usage for display in UI. */
 export async function getRemainingUsage(userId: string): Promise<Record<LimitKey, number>> {
+  const isPro = await hasProAccess(userId);
+  if (isPro) {
+    return {
+      aiChatMessages: -1,
+      flashcardDecks: -1,
+      quizzes: -1,
+      notesUploaded: -1,
+    };
+  }
+
+  const usage = await getUsage(userId);
   return {
-    aiChatMessages: -1,
-    flashcardDecks: -1,
-    quizzes: -1,
-    notesUploaded: -1,
+    aiChatMessages: Math.max(0, FREE_LIMITS.aiChatMessages - usage.aiChatMessages),
+    flashcardDecks: Math.max(0, FREE_LIMITS.flashcardDecks - usage.flashcardDecks),
+    quizzes: Math.max(0, FREE_LIMITS.quizzes - usage.quizzes),
+    notesUploaded: Math.max(0, FREE_LIMITS.notesUploaded - usage.notesUploaded),
   };
 }

@@ -1,15 +1,9 @@
 import { jsonError } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { isEntitled } from "@/app/lib/billing/entitlement";
+import { getSubscriptionState } from "@/app/lib/billing/entitlement";
 import { payments } from "@/app/lib/payments";
-
-const PRO_SUBSCRIPTION_STATUSES = new Set([
-  "active", "trialing", "past_due", "unpaid", "canceled", "paused", "cancelled"
-]);
-
-function normalizeStatus(status: string): string {
-  return status === "canceled" ? "cancelled" : status;
-}
 
 /**
  * Cancel Pro at the end of the current paid period.
@@ -39,9 +33,7 @@ export async function POST(req: Request) {
         return jsonError("You don't have an ACED Pro subscription.", 400);
     }
 
-    // Check if subscription is in a cancellable state (not already cancelled)
-    const normalizedStatus = normalizeStatus(subscription.status);
-    if (!PRO_SUBSCRIPTION_STATUSES.has(normalizedStatus)) {
+    if (!isEntitled(subscription)) {
         return jsonError("Your subscription isn't active, so there's nothing to cancel.", 400);
     }
 
@@ -71,30 +63,6 @@ export async function POST(req: Request) {
         return jsonError("Cancellation was recorded by the provider, but syncing failed.", 500);
     }
 
-    // Return updated subscription state
-    const updatedSubscription = await prisma.subscription.findUnique({
-        where: { userId: user.id },
-        select: {
-            plan: true,
-            status: true,
-            currentPeriodStart: true,
-            currentPeriodEnd: true,
-            cancelAtPeriodEnd: true,
-        },
-    });
-
-    if (!updatedSubscription) {
-        return jsonError("Something went wrong", 500);
-    }
-
-    return Response.json({
-        subscription: {
-            plan: updatedSubscription.plan,
-            status: normalizeStatus(updatedSubscription.status),
-            currentPeriodStart: updatedSubscription.currentPeriodStart?.toISOString() ?? null,
-            currentPeriodEnd: updatedSubscription.currentPeriodEnd?.toISOString() ?? null,
-            cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
-            hasProAccess: true,
-        },
-    });
+    const state = await getSubscriptionState(user.id);
+    return Response.json({ subscription: state });
 }

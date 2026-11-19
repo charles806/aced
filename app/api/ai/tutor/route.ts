@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { jsonError, safeJsonBody } from "@/app/lib/api";
 import { prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { requireProAccess } from "@/app/lib/billing/guard";
+import { canUseFreeFeature, incrementUsage } from "@/app/lib/billing/limits";
 import { streamText } from "@/app/lib/ai/ai";
 import {
     encodeTutorEvent,
@@ -195,6 +197,12 @@ export async function GET(req: Request) {
         return jsonError("Unauthorized", 401);
     }
 
+    const proAccess = await requireProAccess(user.id);
+
+    if (!proAccess.ok) {
+        return proAccess.response;
+    }
+
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
 
@@ -250,7 +258,7 @@ export async function GET(req: Request) {
 /**
  * Ask the tutor a question and stream the answer back.
  *
- * Everything that can be rejected (auth, validation, note ownership,
+ * Everything that can be rejected (auth, Pro, validation, note ownership,
  * extraction readiness, conversation ownership, the note/conversation link) is
  * still resolved *before* the stream opens, so those failures stay plain JSON
  * responses with a status code. Once the stream is open the client gets
@@ -271,7 +279,23 @@ export async function POST(req: Request) {
         return jsonError("Unauthorized", 401);
     }
 
-    // 2. Validate. Only noteId and message are read; userId / extractedText sent by the client are ignored.
+    // 2. Check access: Pro users have unlimited access, free users have limited access.
+    const proAccess = await requireProAccess(user.id);
+    const isPro = proAccess.ok;
+
+    if (!isPro) {
+        // Check free tier limit for AI chat messages
+        const chatLimit = await canUseFreeFeature(user.id, "aiChatMessages");
+        if (!chatLimit.allowed) {
+            return jsonError(
+                `Free tier limit reached: you can send up to ${chatLimit.limit} AI chat messages. Upgrade to Pro for unlimited messages.`,
+                403
+            );
+        }
+    }
+
+    // 3. Validate. Only noteId and message are read; userId / isPro /
+    // extractedText sent by the client are ignored.
     const jsonBody = await safeJsonBody(req);
 
     if (!jsonBody) {
@@ -311,7 +335,7 @@ export async function POST(req: Request) {
         );
     }
 
-    // 3. Find the note — always scoped to the authenticated user (if noteId provided).
+    // 4. Find the note — always scoped to the authenticated user (if noteId provided).
     let note: { id: string; title: string; extractedText: string | null; extractionStatus: string; content: string | null } | null = null;
     let material: string | null = null;
 
@@ -339,7 +363,7 @@ export async function POST(req: Request) {
             return jsonError("Note not found", 404);
         }
 
-        // 4. The tutor needs usable study material.
+        // 5. The tutor needs usable study material.
         material =
             (note.extractionStatus === "completed"
                 ? note.extractedText?.trim()
@@ -362,7 +386,7 @@ export async function POST(req: Request) {
         }
     }
 
-    // 5. Resolve the conversation, save the student's message, and build the
+    // 6. Resolve the conversation, save the student's message, and build the
     //    model input. All of this happens before the stream opens so failures
     //    are still ordinary JSON errors with a status code.
     const studentMessage = message.trim();
@@ -438,7 +462,7 @@ export async function POST(req: Request) {
         return jsonError("Something went wrong", 500);
     }
 
-    // 6. Stream the answer. `streamText` accumulates the full reply and resolves
+    // 7. Stream the answer. `streamText` accumulates the full reply and resolves
     //    it only after the provider stream finishes; that resolved string is the
     //    single assistant message we persist.
     const encoder = new TextEncoder();
@@ -491,6 +515,10 @@ export async function POST(req: Request) {
                             content: answer,
                         },
                     });
+
+                    if (!isPro) {
+                        await incrementUsage(user.id, "aiChatMessages");
+                    }
 
                     // Keep history ordering correct; a failed touch must not
                     // turn a successful turn into an error event.

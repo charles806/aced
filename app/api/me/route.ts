@@ -1,7 +1,6 @@
 import { auth, prisma } from "@/app/lib/auth";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { jsonError, safeJsonBody, validateName } from "@/app/lib/api";
-import { cookies } from "next/headers";
 
 type RadonUserRow = {
     id: string;
@@ -98,47 +97,6 @@ export async function PATCH(req: Request) {
         return Response.json({ user: sanitizeUserForClient(updated) });
     } catch (error) {
         console.error("PATCH /api/me failed:", error);
-        return jsonError("Something went wrong", 500);
-    }
-}
-
-export async function DELETE(req: Request) {
-    const user = await getCurrentUser(req);
-
-    if (!user) {
-        return jsonError("Unauthorized", 401);
-    }
-
-    const userId = user.id;
-
-    try {
-        // Delete all user data in a transaction.
-        // Cascade deletes handle most relations (notes, subjects, flashcards, quizzes, etc.),
-        // but we must explicitly delete Radon auth models that don't cascade from RadonUser.
-        await prisma.$transaction(async (tx) => {
-            // Delete Radon auth records for this user
-            await tx.radonRefreshToken.deleteMany({ where: { userId } });
-            await tx.radonApiKey.deleteMany({ where: { userId } });
-            await tx.radonSession.deleteMany({ where: { userId } });
-            await tx.radonIdentity.deleteMany({ where: { userId } });
-
-            // Delete the RadonUser - cascade handles all user-owned data
-            await tx.radonUser.delete({ where: { id: userId } });
-        });
-
-        // Clear the session cookie
-        const cookieStore = await cookies();
-        cookieStore.set("aced_session", "", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-            maxAge: 0,
-        });
-
-        return Response.json({ ok: true });
-    } catch (error) {
-        console.error("DELETE /api/me failed:", error);
         return jsonError("Something went wrong", 500);
     }
 }
